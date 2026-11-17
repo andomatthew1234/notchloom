@@ -15,6 +15,7 @@ struct MusicSlotConfigurationView: View {
     @State private var draggedSlot: MusicControlButton?
 
     private let fixedSlotCount: Int = 5
+    private let paletteColumns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -24,7 +25,7 @@ struct MusicSlotConfigurationView: View {
             // Reset button
             HStack {
                 Spacer()
-                Button("Reset to Defaults") {
+                Button("Restore default controls") {
                     withAnimation {
                         musicControlSlots = MusicControlButton.defaultLayout
                     }
@@ -70,9 +71,8 @@ struct MusicSlotConfigurationView: View {
                     }
                 }
             }
-            .padding(12)
-            .background(Color(NSColor.controlBackgroundColor))
-            .cornerRadius(8)
+            .padding(8)
+            .background(Color(NSColor.controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
 
             VStack(spacing: 8) {
                 ZStack {
@@ -90,7 +90,7 @@ struct MusicSlotConfigurationView: View {
                     return handleDropOnTrash(providers)
                 }
 
-                Text("Clear slot")
+                Text("Remove")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -101,66 +101,50 @@ struct MusicSlotConfigurationView: View {
     }
 
     private var slotConfigurationSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Layout Preview")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text("Drag items in the preview to reorder or drop from the palette")
-                    .font(.subheadline)
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Current layout")
+                    .font(.subheadline.weight(.semibold))
+                Text("Drag controls to reorder them, or drop one on Remove.")
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
             previewSection
 
             Divider()
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Drag a control onto a slot")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            Text("Available controls")
+                .font(.subheadline.weight(.semibold))
 
-                ScrollView(.horizontal) {
-                    HStack(spacing: 12) {
-                        ForEach(MusicControlButton.pickerOptions, id: \.self) { control in
-                            VStack(spacing: 6) {
-                                ZStack {
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .fill(Color(NSColor.controlBackgroundColor))
-                                        .frame(width: 44, height: 44)
-
-                                    if control != .none {
-                                        Image(systemName: control.iconName)
-                                            .font(.system(size: control.prefersLargeScale ? 18 : 15, weight: .medium))
-                                            .foregroundStyle(control == .none ? Color.secondary : Color.primary)
-                                            .frame(width: 28, height: 28)
-                                    }
-                                }
-                                .cornerRadius(8)
-                                .contentShape(RoundedRectangle(cornerRadius: 8))
-                                .onDrag {
-                                    return NSItemProvider(object: NSString(string: "control:\(control.rawValue)"))
-                                }
-                                .onTapGesture {
-                                    if let idx = musicControlSlots.firstIndex(of: .none) {
-                                        updateSlot(control, at: idx)
-                                    } else {
-                                        withAnimation { updateSlot(control, at: 0) }
-                                    }
-                                }
-
-                                Text(control.label)
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                    .frame(width: 60)
-                                    .multilineTextAlignment(.center)
-                                    .lineLimit(2)
-                            }
+            LazyVGrid(columns: paletteColumns, spacing: 8) {
+                ForEach(MusicControlButton.pickerOptions, id: \.self) { control in
+                    Button {
+                        if let index = musicControlSlots.firstIndex(of: .none) {
+                            updateSlot(control, at: index)
+                        } else {
+                            withAnimation { updateSlot(control, at: 0) }
                         }
+                    } label: {
+                        HStack(spacing: 9) {
+                            Image(systemName: control.iconName)
+                                .font(.system(size: 14, weight: .medium))
+                                .frame(width: 20)
+                            Text(control.label)
+                                .font(.caption)
+                                .lineLimit(1)
+                            Spacer(minLength: 0)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(Color(NSColor.controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
                     }
-                    .padding(.vertical, 4)
+                    .buttonStyle(.plain)
+                    .help("Add \(control.label) to the player controls")
+                    .onDrag {
+                        NSItemProvider(object: NSString(string: "control:\(control.rawValue)"))
+                    }
                 }
-                .scrollIndicators(.visible)
             }
         }
     }
