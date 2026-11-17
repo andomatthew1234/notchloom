@@ -82,6 +82,7 @@ struct SettingsView: View {
         case "General": return ("General", "Choose where Notchloom appears and how it opens.", "gearshape")
         case "Appearance": return ("Appearance", "Adjust the look of the notch and music player.", "paintbrush.pointed")
         case "Media": return ("Media", "Pick your music source, controls, and playback behavior.", "music.note")
+        case "QuickApps": return ("Quick apps", "Choose the apps one click away in the notch.", "square.grid.2x2")
         case "Notifications": return ("Notifications", "See new app banners emerge from the notch.", "bell.badge")
         case "Calendar": return ("Calendar", "Choose which events and reminders appear in the notch.", "calendar")
         case "HUD": return ("System HUD", "Show volume and brightness changes around the notch.", "slider.horizontal.3")
@@ -125,6 +126,9 @@ struct SettingsView: View {
                     }
                 }
                 Section("TOOLS") {
+                    NavigationLink(value: "QuickApps") {
+                        Label("Quick apps", systemImage: "square.grid.2x2")
+                    }
                     NavigationLink(value: "Notifications") {
                         Label("Notifications", systemImage: "bell.badge")
                     }
@@ -181,6 +185,8 @@ struct SettingsView: View {
                     Appearance()
                 case "Media":
                     Media()
+                case "QuickApps":
+                    QuickAppsSettings()
                 case "Notifications":
                     NotificationsSettings()
                 case "Calendar":
@@ -811,6 +817,62 @@ struct Media: View {
         } else {
             return MediaControllerType.allCases
         }
+    }
+}
+
+struct QuickAppsSettings: View {
+    @ObservedObject private var apps = QuickAppsManager.shared
+
+    var body: some View {
+        Form {
+            Section {
+                ForEach(apps.favorites, id: \.self) { bundleID in
+                    HStack(spacing: 10) {
+                        if let icon = apps.icon(for: bundleID) {
+                            Image(nsImage: icon)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 25, height: 25)
+                        }
+                        Text(apps.name(for: bundleID))
+                        Spacer()
+                        Button {
+                            apps.move(bundleID, by: -1)
+                        } label: {
+                            Image(systemName: "arrow.up")
+                        }
+                        .disabled(apps.favorites.first == bundleID)
+                        .help("Move up")
+                        Button {
+                            apps.move(bundleID, by: 1)
+                        } label: {
+                            Image(systemName: "arrow.down")
+                        }
+                        .disabled(apps.favorites.last == bundleID)
+                        .help("Move down")
+                        Button {
+                            apps.remove(bundleID)
+                        } label: {
+                            Image(systemName: "minus.circle")
+                        }
+                        .help("Remove \(apps.name(for: bundleID))")
+                    }
+                    .buttonStyle(.borderless)
+                }
+                if apps.favorites.count < QuickAppsManager.limit {
+                    Button("Add app…") { apps.chooseApps() }
+                }
+                Button("Restore default apps") { apps.restoreDefaults() }
+                if let message = apps.message {
+                    Text(message).foregroundStyle(.orange)
+                }
+            } header: {
+                Text("Favorites in the notch")
+            } footer: {
+                Text("Keep up to four apps here. Open the notch and choose Tools to launch them.")
+            }
+        }
+        .tint(NotchloomTheme.cyan)
     }
 }
 

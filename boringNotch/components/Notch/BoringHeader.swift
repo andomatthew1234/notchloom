@@ -16,7 +16,7 @@ struct BoringHeader: View {
     var body: some View {
         HStack(spacing: 0) {
             HStack {
-                if (!tvm.isEmpty || coordinator.alwaysShowTabs) && Defaults[.boringShelf] {
+                if coordinator.alwaysShowTabs || (!tvm.isEmpty && Defaults[.boringShelf]) || coordinator.currentView == .tools {
                     TabSelectionView()
                 } else if vm.notchState == .open {
                     EmptyView()
@@ -42,6 +42,17 @@ struct BoringHeader: View {
                         OpenNotchHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon)
                             .transition(.scale(scale: 0.8).combined(with: .opacity))
                     } else {
+                        if !coordinator.alwaysShowTabs && (tvm.isEmpty || !Defaults[.boringShelf]) {
+                            Button {
+                                withAnimation(.smooth) { coordinator.currentView = .tools }
+                            } label: {
+                                Image(systemName: "square.grid.2x2")
+                                    .foregroundColor(.white)
+                                    .frame(width: 30, height: 30)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Open tools")
+                        }
                         if Defaults[.showMirror] {
                             Button(action: {
                                 vm.toggleCameraPreview()

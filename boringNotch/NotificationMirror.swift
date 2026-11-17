@@ -32,7 +32,7 @@ final class NotificationMirror: ObservableObject {
                 if Defaults[.showNotificationBanners] {
                     await self.readVisibleBanners()
                 } else {
-                    self.clear()
+                    self.clearMirroredBanners()
                 }
                 try? await Task.sleep(for: .milliseconds(350))
             }
@@ -46,11 +46,16 @@ final class NotificationMirror: ObservableObject {
     }
 
     func preview() {
+        showLocal(title: "Notifications from the notch", body: "A quiet preview of how new banners will appear.")
+    }
+
+    func showLocal(title: String, body: String) {
+        if queued.count == 3 { queued.removeLast() }
         enqueue(NotchNotification(
             id: UUID().uuidString,
             source: "Notchloom",
-            title: "Notifications from the notch",
-            body: "A quiet preview of how new banners will appear."
+            title: title,
+            body: body
         ))
     }
 
@@ -101,6 +106,19 @@ final class NotificationMirror: ObservableObject {
         queued.removeAll()
         seen.removeAll()
         current = nil
+    }
+
+    private func clearMirroredBanners() {
+        guard didTakeInitialSnapshot || !seen.isEmpty else { return }
+        didTakeInitialSnapshot = false
+        seen.removeAll()
+        queued.removeAll { $0.source != "Notchloom" }
+        if current?.source != "Notchloom" {
+            dismissTask?.cancel()
+            dismissTask = nil
+            current = nil
+            presentNext()
+        }
     }
 }
 

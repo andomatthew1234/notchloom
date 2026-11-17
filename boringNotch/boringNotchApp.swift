@@ -291,6 +291,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NotificationMirror.shared.start()
+        _ = FocusTimerManager.shared
         // Apply the login preference only on a fresh installation. Existing users keep
         // their own login-item choice, and the marker prevents later re-registration.
         let userDefaults = UserDefaults.standard
