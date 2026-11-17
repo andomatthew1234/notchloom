@@ -20,6 +20,7 @@ class MusicManager: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var controllerCancellables = Set<AnyCancellable>()
     private var debounceIdleTask: Task<Void, Never>?
+    private var overviewPauseTask: Task<Void, Never>?
 
     // Helper to check if macOS has removed support for NowPlayingController
     public private(set) var isNowPlayingDeprecated: Bool = false
@@ -33,6 +34,7 @@ class MusicManager: ObservableObject {
     @Published var artistName: String = "Me"
     @Published var albumArt: NSImage = defaultImage
     @Published var isPlaying = false
+    @Published private(set) var overviewMusicVisible = false
     @Published var album: String = "Self Love"
     @Published var isPlayerIdle: Bool = true
     @Published var animations: BoringAnimations = .init()
@@ -98,6 +100,7 @@ class MusicManager: ObservableObject {
     
     public func destroy() {
         debounceIdleTask?.cancel()
+        overviewPauseTask?.cancel()
         cancellables.removeAll()
         controllerCancellables.removeAll()
         flipWorkItem?.cancel()
@@ -184,6 +187,17 @@ class MusicManager: ObservableObject {
         // Check for playback state changes (playing/paused)
         if state.isPlaying != self.isPlaying {
             NSLog("Playback state changed: \(state.isPlaying ? "Playing" : "Paused")")
+            overviewPauseTask?.cancel()
+            overviewMusicVisible = true
+            if !state.isPlaying {
+                overviewPauseTask = Task { @MainActor [weak self] in
+                    try? await Task.sleep(for: .seconds(30))
+                    guard !Task.isCancelled else { return }
+                    withAnimation(.smooth(duration: 0.3)) {
+                        self?.overviewMusicVisible = false
+                    }
+                }
+            }
             withAnimation(.smooth) {
                 self.isPlaying = state.isPlaying
                 self.updateIdleState(state: state.isPlaying)

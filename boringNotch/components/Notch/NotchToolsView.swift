@@ -13,6 +13,7 @@ struct NotchToolsView: View {
     @Default(.showMirror) private var showMirror
     @Default(.showBatteryIndicator) private var showBattery
     @State private var panel: OverviewPanel = .dashboard
+    @State private var isHoveringArtwork = false
 
     private enum OverviewPanel: Equatable {
         case dashboard
@@ -21,8 +22,9 @@ struct NotchToolsView: View {
         case mirror
     }
 
-    private var hasTrack: Bool {
-        music.isPlaying || (!music.songTitle.isEmpty && music.songTitle != "I'm Handsome")
+    private var showsOverviewArtwork: Bool {
+        music.overviewMusicVisible && !music.songTitle.isEmpty
+            && music.songTitle != "I'm Handsome"
     }
 
     var body: some View {
@@ -86,7 +88,8 @@ struct NotchToolsView: View {
         switch panel {
         case .dashboard:
             HStack(spacing: 12) {
-                nowPlayingCard.frame(maxWidth: .infinity)
+                nowPlayingSlot
+                Spacer(minLength: 0)
                 appsSection.frame(width: 230, alignment: .topLeading)
             }
             .padding(.horizontal, 18)
@@ -154,61 +157,87 @@ struct NotchToolsView: View {
         }
     }
 
-    private var nowPlayingCard: some View {
-        HStack(spacing: 12) {
-            Group {
-                if !hasTrack {
-                    Image(systemName: "music.note")
-                        .font(.system(size: 25, weight: .light))
-                        .foregroundStyle(.white.opacity(0.5))
-                        .frame(width: 76, height: 76)
-                        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 13))
-                } else {
-                    Image(nsImage: music.albumArt)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 76, height: 76)
-                        .clipShape(RoundedRectangle(cornerRadius: 13))
-                }
+    private var nowPlayingSlot: some View {
+        ZStack {
+            if showsOverviewArtwork {
+                artworkControl
+                    .transition(.opacity.combined(with: .scale(scale: 0.94)))
             }
-            .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 5) {
-                Label("Now Playing", systemImage: "play.circle.fill")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.cyan)
-                Text(hasTrack ? music.songTitle : "Nothing playing")
-                    .font(.system(size: 14, weight: .semibold))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                Text(hasTrack ? music.artistName : "Your music will appear here.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.62))
-                    .lineLimit(1)
-                if hasTrack {
-                    HStack(spacing: 13) {
-                        Button { music.previousTrack() } label: {
-                            Image(systemName: "backward.fill")
-                        }
-                        .help("Previous track")
-                        Button { music.playPause() } label: {
-                            Image(systemName: music.isPlaying ? "pause.fill" : "play.fill")
-                        }
-                        .help(music.isPlaying ? "Pause" : "Play")
-                        Button { music.nextTrack() } label: {
-                            Image(systemName: "forward.fill")
-                        }
-                        .help("Next track")
-                    }
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.88))
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(height: 108)
-        .padding(.horizontal, 14)
-        .background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 17))
+        .frame(width: 112, height: 112)
+        .animation(.smooth(duration: 0.3), value: showsOverviewArtwork)
+    }
+
+    private var artworkControl: some View {
+        ZStack(alignment: .bottomTrailing) {
+            Image(nsImage: music.albumArt)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 112, height: 112)
+                .saturation(music.isPlaying ? 1 : 0.55)
+                .brightness(music.isPlaying ? 0 : -0.12)
+                .scaleEffect(isHoveringArtwork ? 1.05 : 1)
+                .blur(radius: isHoveringArtwork ? 6 : 0)
+                .accessibilityHidden(true)
+
+            Color.black.opacity(isHoveringArtwork ? 0.36 : 0)
+                .allowsHitTesting(false)
+
+            HStack(spacing: 4) {
+                artworkButton("backward.fill", label: "Previous track") {
+                    music.previousTrack()
+                }
+                artworkButton(music.isPlaying ? "pause.fill" : "play.fill",
+                              label: music.isPlaying ? "Pause" : "Play") {
+                    music.playPause()
+                }
+                artworkButton("forward.fill", label: "Next track") {
+                    music.nextTrack()
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .opacity(isHoveringArtwork ? 1 : 0)
+            .scaleEffect(isHoveringArtwork ? 1 : 0.92)
+            .allowsHitTesting(isHoveringArtwork)
+
+            Group {
+                if music.isPlaying {
+                    AudioSpectrumView(isPlaying: $music.isPlaying)
+                        .frame(width: 16, height: 16)
+                } else {
+                    Image(systemName: "pause.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                        .frame(width: 16, height: 16)
+                }
+            }
+            .foregroundStyle(.white)
+            .frame(width: 27, height: 27)
+            .background(.black.opacity(0.86), in: Circle())
+            .padding(7)
+            .opacity(isHoveringArtwork ? 0 : 1)
+            .accessibilityHidden(true)
+        }
+        .frame(width: 112, height: 112)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .onHover { isHoveringArtwork = $0 }
+        .animation(.easeInOut(duration: 0.25), value: isHoveringArtwork)
+        .animation(.easeInOut(duration: 0.25), value: music.isPlaying)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Now Playing: \(music.songTitle) by \(music.artistName)")
+    }
+
+    private func artworkButton(_ symbol: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 31, height: 32)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .help(label)
     }
 
     private var focusSection: some View {
