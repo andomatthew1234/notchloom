@@ -14,6 +14,56 @@ import Sparkle
 import SwiftUI
 import SwiftUIIntrospect
 
+private enum NotchloomTheme {
+    static let cyan = Color(red: 0.20, green: 0.91, blue: 0.96)
+    static let violet = Color(red: 0.69, green: 0.43, blue: 0.98)
+    static let ink = Color(red: 0.055, green: 0.065, blue: 0.11)
+    static let gradient = LinearGradient(
+        colors: [cyan, violet], startPoint: .leading, endPoint: .trailing)
+}
+
+private struct NotchloomSettingsHeader: View {
+    let title: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image("NotchloomIcon")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 38, height: 38)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("NOTCHLOOM")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .tracking(2.2)
+                    .foregroundStyle(NotchloomTheme.gradient)
+                Text(title)
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 13)
+        .background {
+            NotchloomTheme.ink
+                .overlay(alignment: .trailing) {
+                    Circle()
+                        .fill(NotchloomTheme.violet.opacity(0.22))
+                        .frame(width: 170, height: 170)
+                        .blur(radius: 54)
+                        .offset(x: 20)
+                }
+        }
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(NotchloomTheme.gradient)
+                .frame(height: 2)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
 struct SettingsView: View {
     @State private var selectedTab = "General"
     @State private var accentColorUpdateTrigger = UUID()
@@ -27,6 +77,23 @@ struct SettingsView: View {
     var body: some View {
         NavigationSplitView {
             List(selection: $selectedTab) {
+                HStack(spacing: 10) {
+                    Image("NotchloomIcon")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 42, height: 42)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Notchloom")
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                        Text("Your notch, woven in")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.vertical, 12)
+                .listRowBackground(Color.clear)
+                .accessibilityElement(children: .combine)
                 NavigationLink(value: "General") {
                     Label("General", systemImage: "gear")
                 }
@@ -65,11 +132,14 @@ struct SettingsView: View {
                 }
             }
             .listStyle(SidebarListStyle())
-            .tint(.effectiveAccent)
+            .tint(NotchloomTheme.cyan)
+            .accentColor(NotchloomTheme.cyan)
             .toolbar(removing: .sidebarToggle)
             .navigationSplitViewColumnWidth(200)
         } detail: {
-            Group {
+            VStack(spacing: 0) {
+                NotchloomSettingsHeader(title: selectedTab == "HUD" ? "HUDs" : selectedTab)
+                Group {
                 switch selectedTab {
                 case "General":
                     GeneralSettings()
@@ -104,8 +174,11 @@ struct SettingsView: View {
                 default:
                     GeneralSettings()
                 }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .navigationTitle("Notchloom Settings")
         }
         .navigationSplitViewStyle(.balanced)
         .toolbar(removing: .sidebarToggle)
@@ -118,8 +191,10 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 700)
-        .background(Color(NSColor.windowBackgroundColor))
-        .tint(.effectiveAccent)
+        .background(NotchloomTheme.ink)
+        .tint(NotchloomTheme.cyan)
+        .accentColor(NotchloomTheme.cyan)
+        .preferredColorScheme(.dark)
         .id(accentColorUpdateTrigger)
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("AccentColorChanged"))) { _ in
             accentColorUpdateTrigger = UUID()
@@ -158,7 +233,7 @@ struct GeneralSettings: View {
                 )) {
                     Text("Show menu bar icon")
                 }
-                .tint(.effectiveAccent)
+                .tint(NotchloomTheme.cyan)
                 LaunchAtLogin.Toggle("Launch at login")
                 Defaults.Toggle(key: .showOnAllDisplays) {
                     Text("Show on all displays")
@@ -269,8 +344,7 @@ struct GeneralSettings: View {
             }
             .controlSize(.extraLarge)
         }
-        .accentColor(.effectiveAccent)
-        .navigationTitle("General")
+        .tint(NotchloomTheme.cyan)
         .onChange(of: openNotchOnHover) {
             if !openNotchOnHover {
                 enableGestures = true
@@ -377,8 +451,7 @@ struct Charge: View {
                 await XPCHelperClient.shared.isAccessibilityAuthorized()
             }
         }
-        .accentColor(.effectiveAccent)
-        .navigationTitle("Battery")
+        .tint(NotchloomTheme.cyan)
     }
 }
 
@@ -571,8 +644,7 @@ struct HUD: View {
             }
             .disabled(!Defaults[.hudReplacement])
         }
-        .accentColor(.effectiveAccent)
-        .navigationTitle("HUDs")
+        .tint(NotchloomTheme.cyan)
         .task {
             accessibilityAuthorized = await XPCHelperClient.shared.isAccessibilityAuthorized()
         }
@@ -694,8 +766,7 @@ struct Media: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .accentColor(.effectiveAccent)
-        .navigationTitle("Media")
+        .tint(NotchloomTheme.cyan)
     }
 
     // Only show controller options that are available on this macOS version
@@ -805,8 +876,7 @@ struct CalendarSettings: View {
                 }
             }
         }
-        .accentColor(.effectiveAccent)
-        .navigationTitle("Calendar")
+        .tint(NotchloomTheme.cyan)
         .onAppear {
             Task {
                 await calendarManager.checkCalendarAuthorization()
@@ -839,15 +909,29 @@ struct About: View {
     @Environment(\.openWindow) var openWindow
     var body: some View {
         VStack {
-            VStack(spacing: 6) {
+            HStack(spacing: 14) {
                 Image("NotchloomIcon")
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 64, height: 64)
-                Text("Notchloom")
-                    .font(.headline)
+                    .frame(width: 72, height: 72)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Notchloom")
+                        .font(.system(size: 25, weight: .bold, design: .rounded))
+                    Text("Your notch, woven in")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
             }
-            .padding(.top, 10)
+            .padding(16)
+            .background(NotchloomTheme.ink, in: RoundedRectangle(cornerRadius: 18))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(NotchloomTheme.gradient, lineWidth: 1)
+                    .opacity(0.8)
+            }
+            .padding([.horizontal, .top], 20)
             Form {
                 Section {
                     HStack {
@@ -863,7 +947,7 @@ struct About: View {
                             Text("(\(Bundle.main.buildVersionNumber ?? ""))")
                                 .foregroundStyle(.secondary)
                         }
-                        Text(Bundle.main.releaseVersionNumber ?? "unkown")
+                        Text(Bundle.main.releaseVersionNumber ?? "unknown")
                             .foregroundStyle(.secondary)
                     }
                     .onTapGesture {
@@ -915,7 +999,6 @@ struct About: View {
             //            .controlSize(.extraLarge)
             CheckForUpdatesView(updater: updaterController.updater)
         }
-        .navigationTitle("About")
     }
 }
 
@@ -1023,8 +1106,7 @@ struct Shelf: View {
                     .foregroundColor(.secondary)
             }
         }
-        .accentColor(.effectiveAccent)
-        .navigationTitle("Shelf")
+        .tint(NotchloomTheme.cyan)
     }
 }
 
@@ -1160,7 +1242,7 @@ struct Shelf: View {
 //                }
 //            }
 //        }
-//        .accentColor(.effectiveAccent)
+//        .tint(NotchloomTheme.cyan)
 //        .navigationTitle("Extensions")
 //        // TipsView()
 //        // .padding(.horizontal, 19)
@@ -1406,8 +1488,7 @@ struct Appearance: View {
                 }
             }
         }
-        .accentColor(.effectiveAccent)
-        .navigationTitle("Appearance")
+        .tint(NotchloomTheme.cyan)
     }
 
     func checkVideoInput() -> Bool {
@@ -1639,8 +1720,7 @@ struct Advanced: View {
                 Text("Window Behavior")
             }
         }
-        .accentColor(.effectiveAccent)
-        .navigationTitle("Advanced")
+        .tint(NotchloomTheme.cyan)
         .onAppear {
             loadCustomColor()
         }
@@ -1751,8 +1831,7 @@ struct Shortcuts: View {
                 KeyboardShortcuts.Recorder("Toggle Notch Open:", name: .toggleNotchOpen)
             }
         }
-        .accentColor(.effectiveAccent)
-        .navigationTitle("Shortcuts")
+        .tint(NotchloomTheme.cyan)
     }
 }
 

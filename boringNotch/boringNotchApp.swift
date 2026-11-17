@@ -47,6 +47,14 @@ struct DynamicNotchApp: App {
             }
             .keyboardShortcut(KeyEquivalent("Q"), modifiers: .command)
         }
+        .commands {
+            CommandGroup(replacing: .appSettings) {
+                Button("Notchloom Settings…") {
+                    SettingsWindowController.shared.showWindow()
+                }
+                .keyboardShortcut(",", modifiers: .command)
+            }
+        }
     }
 }
 

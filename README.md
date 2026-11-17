@@ -38,6 +38,16 @@ Screen identifiers, completed onboarding, permissions, and other device-specific
 
 The fork's [appcast](appcast.xml) is empty until the first signed binary release. The update signing private key is kept outside the repository.
 
+## Installer
+
+The branded drag-to-Applications disk image is built from a signed Release app:
+
+```bash
+installer/build_dmg.sh /path/to/Notchloom.app
+```
+
+The script uses `uvx` to run a pinned `dmgbuild` version and writes the versioned image to `dist/`. Its Finder artwork and layout live in [`installer/`](installer/). The disk image made for local testing uses an Apple Development signature; a public Mac download still needs a Developer ID signature and Apple notarization.
+
 ## Credits and license
 
 Based on Boring Notch by [TheBoredTeam](https://github.com/TheBoredTeam/boring.notch). Notchloom retains the project's [GNU GPLv3 license](LICENSE). The Notchloom icon was generated for this fork and prepared for the macOS app icon asset catalog.
