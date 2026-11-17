@@ -897,6 +897,12 @@ struct NotificationsSettings: View {
                     Button("Preview in the notch") {
                         NotificationMirror.shared.preview()
                     }
+                    Button("Preview a Clock timer") {
+                        NotificationMirror.shared.previewClock(timer: true)
+                    }
+                    Button("Preview a Clock alarm") {
+                        NotificationMirror.shared.previewClock(timer: false)
+                    }
                     if !accessibilityGranted {
                         Button("Request Accessibility access") {
                             XPCHelperClient.shared.requestAccessibilityAuthorization()
@@ -907,7 +913,7 @@ struct NotificationsSettings: View {
                 } header: {
                     Text("Try it")
                 } footer: {
-                    Text("Notifications appear briefly, then the notch returns to what you were doing.")
+                    Text("Clock alarms and finished timers receive a longer, warmer alert when macOS shows their notification on screen. The original Clock controls stay available.")
                 }
             }
         }

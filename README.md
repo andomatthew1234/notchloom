@@ -25,7 +25,7 @@ Notchloom is a macOS notch utility built from [Boring Notch](https://github.com/
 
 - **Music at a glance.** See artwork and playback status, use configurable controls, and show lyrics when available.
 - **A custom system HUD.** Show volume, brightness, and keyboard backlight changes in the notch, including a compact inline view when closed.
-- **Notifications from the notch.** Mirror visible macOS app banners in a brief, rounded notch card. The original banner stays available for its actions.
+- **Notifications from the notch.** Mirror visible macOS app banners in a refined notch card. Clock alarms and finished timers receive a longer, warm-accented presentation. The original banner stays available for its actions.
 - **Focus time.** Start a 5, 15, 25, or 50 minute session, pause it, and see a quiet completion card. The timer survives app restarts.
 - **Quick apps.** Launch up to four favorite Mac apps from the notch and arrange them in Settings.
 - **Sound output.** See the current speaker or headphones and switch outputs from the notch.
@@ -50,7 +50,7 @@ You can [build Notchloom from source](#build-from-source). A public installer is
 | Music | Show lyrics and live activity; use Shuffle, Previous, Play/Pause, Next, and Favorite controls |
 | Appearance | Enable the camera mirror and album-art slider colors; leave Calendar and the file shelf off |
 | HUD | Replace the system HUD after Accessibility is granted; use the inline style with glow, accent tint, and percentages |
-| Notifications | Mirror visible app banners from the notch when Accessibility is available |
+| Notifications | Mirror visible app banners and Clock alerts from the notch when Accessibility is available |
 | Tools | Show Finder, Safari, Music, and Calculator as starter quick apps; keep the focus timer idle |
 
 Existing preferences stay in place when upgrading. Permissions, completed onboarding, and device-specific display IDs are never copied from the maintainer's Mac. Camera access is needed for the mirror; Accessibility access is needed for HUD replacement, media-key interception, and visible notification banners. Notchloom does not read notification history or bypass hidden previews.
