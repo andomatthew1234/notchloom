@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="boringNotch/Assets.xcassets/AppIcon.appiconset/notchloom-256.png" width="128" height="128" alt="Notchloom app icon: cyan and violet threads woven around a notch">
+  <img src="boringNotch/Assets.xcassets/AppIcon.appiconset/notchloom-512.png" width="128" height="128" alt="Notchloom app icon: three cyan and violet ripples emerging from a notch">
 </p>
 
 <h1 align="center">Notchloom</h1>
