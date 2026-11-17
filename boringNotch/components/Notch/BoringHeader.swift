@@ -37,6 +37,7 @@ struct BoringHeader: View {
                 Spacer(minLength: 0)
                 if showsTabs {
                     TabSelectionView()
+                        .offset(x: 12)
                 } else {
                     Button {
                         withAnimation(.smooth) { coordinator.currentView = .tools }
