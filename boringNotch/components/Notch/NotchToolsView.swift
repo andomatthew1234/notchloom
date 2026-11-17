@@ -1,27 +1,39 @@
 import SwiftUI
 
+/// Overview shares Home's continuous black surface and content top edge.
 struct NotchToolsView: View {
     @ObservedObject private var focus = FocusTimerManager.shared
     @ObservedObject private var apps = QuickAppsManager.shared
     @ObservedObject private var audio = AudioOutputManager.shared
 
     var body: some View {
-        HStack(spacing: 10) {
-            focusCard
-            appsCard
-            audioCard
+        HStack(alignment: .top, spacing: 0) {
+            focusSection.frame(width: 184, alignment: .topLeading)
+            sectionDivider
+            appsSection.frame(width: 182, alignment: .topLeading)
+            sectionDivider
+            audioSection.frame(width: 170, alignment: .topLeading)
         }
+        .frame(height: 133, alignment: .top)
         .padding(.top, 5)
-        .frame(maxWidth: .infinity, alignment: .center)
+        .frame(maxWidth: .infinity, alignment: .top)
+        .buttonStyle(.plain)
     }
 
-    private var focusCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private var sectionDivider: some View {
+        Rectangle()
+            .fill(.white.opacity(0.13))
+            .frame(width: 1, height: 106)
+            .padding(.horizontal, 10)
+            .padding(.top, 5)
+            .accessibilityHidden(true)
+    }
+
+    private var focusSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 5) {
-                Image(systemName: "timer")
-                    .foregroundStyle(.cyan)
-                Text("Focus")
-                    .fontWeight(.semibold)
+                Image(systemName: "timer").foregroundStyle(.cyan)
+                Text("Focus").foregroundStyle(.white)
                 Spacer(minLength: 0)
                 Menu {
                     Button("5 minutes") { focus.start(minutes: 5) }
@@ -30,26 +42,29 @@ struct NotchToolsView: View {
                     Button("50 minutes") { focus.start(minutes: 50) }
                 } label: {
                     Image(systemName: "ellipsis.circle")
-                        .foregroundStyle(.white.opacity(0.65))
+                        .foregroundStyle(.white.opacity(0.75))
+                        .frame(width: 28, height: 28)
+                        .contentShape(Circle())
                 }
                 .menuStyle(.borderlessButton)
-                .frame(width: 20)
                 .help("Choose a focus duration")
             }
-            .font(.system(size: 12))
+            .font(.system(size: 13, weight: .semibold))
 
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
+            HStack(alignment: .center, spacing: 7) {
                 Text(focus.phase == .finished ? "Done" : focus.timeLabel)
-                    .font(.system(size: 25, weight: .semibold, design: .rounded))
+                    .font(.system(size: 27, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .contentTransition(.numericText())
                     .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                 Spacer(minLength: 0)
                 if focus.phase == .running || focus.phase == .paused {
-                    Button {
-                        focus.reset()
-                    } label: {
+                    Button { focus.reset() } label: {
                         Image(systemName: "xmark")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.68))
+                            .frame(width: 28, height: 28)
                     }
                     .help("Reset focus timer")
                 }
@@ -62,9 +77,9 @@ struct NotchToolsView: View {
                 } label: {
                     Image(systemName: focus.phase == .running ? "pause.fill" : "play.fill")
                         .font(.system(size: 12, weight: .bold))
-                        .frame(width: 27, height: 27)
-                        .background(.cyan, in: Circle())
                         .foregroundStyle(.black)
+                        .frame(width: 30, height: 30)
+                        .background(.cyan, in: Circle())
                 }
                 .help(focus.phase == .running ? "Pause focus timer" : "Start focus timer")
             }
@@ -72,119 +87,95 @@ struct NotchToolsView: View {
             ProgressView(value: focus.progress)
                 .tint(.cyan)
                 .controlSize(.mini)
-            Text(focus.phase == .finished ? "Nice work. Take a break." : "A little time for one thing.")
-                .font(.system(size: 10))
-                .foregroundStyle(.white.opacity(0.55))
-                .lineLimit(1)
+                .accessibilityLabel("Focus session progress")
+            if focus.phase == .finished {
+                Text("Session complete")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.white.opacity(0.65))
+            }
         }
-        .toolCard(width: 192)
     }
 
-    private var appsCard: some View {
-        VStack(alignment: .leading, spacing: 9) {
+    private var appsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 5) {
-                Image(systemName: "square.grid.2x2.fill")
-                    .foregroundStyle(.cyan)
-                Text("Quick apps")
-                    .fontWeight(.semibold)
+                Image(systemName: "square.grid.2x2.fill").foregroundStyle(.cyan)
+                Text("Quick apps").foregroundStyle(.white)
                 Spacer(minLength: 0)
                 if apps.favorites.count < QuickAppsManager.limit {
-                    Button {
-                        apps.chooseApps()
-                    } label: {
+                    Button { apps.chooseApps() } label: {
                         Image(systemName: "plus")
+                            .foregroundStyle(.white.opacity(0.7))
+                            .frame(width: 28, height: 28)
                     }
                     .help("Add a favorite app")
                 }
             }
-            .font(.system(size: 12))
+            .font(.system(size: 13, weight: .semibold))
 
-            HStack(spacing: 5) {
+            HStack(spacing: 6) {
                 ForEach(apps.favorites, id: \.self) { bundleID in
-                    Button {
-                        apps.launch(bundleID)
-                    } label: {
-                        if let icon = apps.icon(for: bundleID) {
-                            Image(nsImage: icon)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 31, height: 31)
-                        } else {
-                            Image(systemName: "app.dashed")
-                                .frame(width: 31, height: 31)
+                    Button { apps.launch(bundleID) } label: {
+                        Group {
+                            if let icon = apps.icon(for: bundleID) {
+                                Image(nsImage: icon).resizable().scaledToFit()
+                            } else {
+                                Image(systemName: "app.dashed").resizable().scaledToFit()
+                            }
                         }
+                        .frame(width: 32, height: 32)
+                        .frame(width: 36, height: 36)
                     }
                     .help("Open \(apps.name(for: bundleID))")
                     .disabled(apps.appURL(for: bundleID) == nil)
                 }
             }
-            .frame(height: 36, alignment: .leading)
-
-            Spacer(minLength: 0)
-            Text(apps.message ?? "Your favorites, one click away.")
-                .font(.system(size: 10))
-                .foregroundStyle(apps.message == nil ? .white.opacity(0.55) : .orange)
-                .lineLimit(1)
+            if let message = apps.message {
+                Text(message).font(.system(size: 11))
+                    .foregroundStyle(.orange).lineLimit(2)
+            }
         }
-        .toolCard(width: 182)
     }
 
-    private var audioCard: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            HStack(spacing: 5) {
-                Image(systemName: "speaker.wave.2.fill")
-                    .foregroundStyle(.cyan)
-                Text("Sound output")
-                    .fontWeight(.semibold)
-            }
-            .font(.system(size: 12))
+    private var audioSection: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            Label("Sound output", systemImage: "speaker.wave.2.fill")
+                .labelStyle(.titleAndIcon)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white)
 
             Menu {
                 ForEach(audio.devices) { device in
-                    Button {
-                        audio.select(device)
-                    } label: {
+                    Button { audio.select(device) } label: {
                         Label(device.name, systemImage: device.id == audio.selectedID
                             ? "checkmark" : device.symbol)
                     }
                 }
             } label: {
-                HStack(spacing: 7) {
+                HStack(spacing: 6) {
                     Image(systemName: audio.selectedDevice?.symbol ?? "speaker.slash")
-                        .font(.system(size: 16))
-                        .frame(width: 25)
+                        .font(.system(size: 15)).frame(width: 20)
                     Text(audio.selectedDevice?.name ?? "No output")
                         .font(.system(size: 12, weight: .medium))
                         .lineLimit(2)
                     Spacer(minLength: 0)
                     Image(systemName: "chevron.up.chevron.down")
                         .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(.white.opacity(0.55))
                 }
-                .frame(maxWidth: .infinity, minHeight: 36)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 9)
+                .frame(height: 42)
+                .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 11))
             }
             .menuStyle(.borderlessButton)
             .disabled(audio.devices.isEmpty)
-            .help("Choose sound output")
+            .help(audio.selectedDevice?.name ?? "Choose sound output")
 
-            Spacer(minLength: 0)
-            Text(audio.message ?? "Switch speakers instantly.")
-                .font(.system(size: 10))
-                .foregroundStyle(audio.message == nil ? .white.opacity(0.55) : .orange)
-                .lineLimit(1)
+            if let message = audio.message {
+                Text(message).font(.system(size: 11))
+                    .foregroundStyle(.orange).lineLimit(2)
+            }
         }
-        .toolCard(width: 184)
-    }
-}
-
-private extension View {
-    func toolCard(width: CGFloat) -> some View {
-        self
-            .padding(12)
-            .frame(width: width, height: 124, alignment: .topLeading)
-            .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(.white.opacity(0.08), lineWidth: 1))
-            .buttonStyle(.plain)
     }
 }
