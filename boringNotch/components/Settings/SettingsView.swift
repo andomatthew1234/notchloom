@@ -24,27 +24,30 @@ private enum NotchloomTheme {
 
 private struct NotchloomSettingsHeader: View {
     let title: String
+    let description: String
+    let symbol: String
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image("NotchloomIcon")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 38, height: 38)
+        HStack(spacing: 15) {
+            Image(systemName: symbol)
+                .font(.system(size: 21, weight: .medium))
+                .foregroundStyle(NotchloomTheme.gradient)
+                .frame(width: 48, height: 48)
+                .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 13))
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("NOTCHLOOM")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .tracking(2.2)
-                    .foregroundStyle(NotchloomTheme.gradient)
+            VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .font(.system(size: 23, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white)
+                Text(description)
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.68))
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 13)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 18)
         .background {
             NotchloomTheme.ink
                 .overlay(alignment: .trailing) {
@@ -74,6 +77,21 @@ struct SettingsView: View {
         self.updaterController = updaterController
     }
 
+    private var pageInfo: (title: String, description: String, symbol: String) {
+        switch selectedTab {
+        case "General": return ("General", "Choose where Notchloom appears and how it opens.", "gearshape")
+        case "Appearance": return ("Appearance", "Adjust the look of the notch and music player.", "paintbrush.pointed")
+        case "Media": return ("Media", "Pick your music source, controls, and playback behavior.", "music.note")
+        case "Calendar": return ("Calendar", "Choose which events and reminders appear in the notch.", "calendar")
+        case "HUD": return ("System HUD", "Show volume and brightness changes around the notch.", "slider.horizontal.3")
+        case "Battery": return ("Battery", "Control charging alerts and battery details.", "battery.100.bolt")
+        case "Shelf": return ("File shelf", "Keep files handy and choose how to share them.", "square.stack.3d.up")
+        case "Shortcuts": return ("Shortcuts", "Set keyboard shortcuts for quick actions.", "keyboard")
+        case "Advanced": return ("Advanced", "Fine-tune colors, windows, and display behavior.", "gearshape.2")
+        default: return ("About", "Version, updates, and project information.", "info.circle")
+        }
+    }
+
     var body: some View {
         NavigationSplitView {
             List(selection: $selectedTab) {
@@ -94,51 +112,63 @@ struct SettingsView: View {
                 .padding(.vertical, 12)
                 .listRowBackground(Color.clear)
                 .accessibilityElement(children: .combine)
-                NavigationLink(value: "General") {
-                    Label("General", systemImage: "gear")
+                Section("YOUR NOTCH") {
+                    NavigationLink(value: "General") {
+                        Label("General", systemImage: "gearshape")
+                    }
+                    NavigationLink(value: "Appearance") {
+                        Label("Appearance", systemImage: "paintbrush.pointed")
+                    }
+                    NavigationLink(value: "Media") {
+                        Label("Media", systemImage: "music.note")
+                    }
                 }
-                NavigationLink(value: "Appearance") {
-                    Label("Appearance", systemImage: "eye")
+                Section("TOOLS") {
+                    NavigationLink(value: "HUD") {
+                        Label("System HUD", systemImage: "slider.horizontal.3")
+                    }
+                    NavigationLink(value: "Calendar") {
+                        Label("Calendar", systemImage: "calendar")
+                    }
+                    NavigationLink(value: "Battery") {
+                        Label("Battery", systemImage: "battery.100.bolt")
+                    }
+                    NavigationLink(value: "Shelf") {
+                        Label("File shelf", systemImage: "square.stack.3d.up")
+                    }
                 }
-                NavigationLink(value: "Media") {
-                    Label("Media", systemImage: "play.laptopcomputer")
-                }
-                NavigationLink(value: "Calendar") {
-                    Label("Calendar", systemImage: "calendar")
-                }
-                NavigationLink(value: "HUD") {
-                    Label("HUDs", systemImage: "dial.medium.fill")
-                }
-                NavigationLink(value: "Battery") {
-                    Label("Battery", systemImage: "battery.100.bolt")
-                }
-//                NavigationLink(value: "Downloads") {
-//                    Label("Downloads", systemImage: "square.and.arrow.down")
-//                }
-                NavigationLink(value: "Shelf") {
-                    Label("Shelf", systemImage: "books.vertical")
-                }
-                NavigationLink(value: "Shortcuts") {
-                    Label("Shortcuts", systemImage: "keyboard")
-                }
-                // NavigationLink(value: "Extensions") {
-                //     Label("Extensions", systemImage: "puzzlepiece.extension")
-                // }
-                NavigationLink(value: "Advanced") {
-                    Label("Advanced", systemImage: "gearshape.2")
-                }
-                NavigationLink(value: "About") {
-                    Label("About", systemImage: "info.circle")
+                Section("APP") {
+                    NavigationLink(value: "Shortcuts") {
+                        Label("Shortcuts", systemImage: "keyboard")
+                    }
+                    NavigationLink(value: "Advanced") {
+                        Label("Advanced", systemImage: "gearshape.2")
+                    }
+                    NavigationLink(value: "About") {
+                        Label("About", systemImage: "info.circle")
+                    }
                 }
             }
             .listStyle(SidebarListStyle())
+            .safeAreaInset(edge: .bottom) {
+                Label("Changes save automatically", systemImage: "checkmark.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 12)
+                    .background(.ultraThinMaterial)
+            }
             .tint(NotchloomTheme.cyan)
             .accentColor(NotchloomTheme.cyan)
             .toolbar(removing: .sidebarToggle)
-            .navigationSplitViewColumnWidth(200)
+            .navigationSplitViewColumnWidth(205)
         } detail: {
             VStack(spacing: 0) {
-                NotchloomSettingsHeader(title: selectedTab == "HUD" ? "HUDs" : selectedTab)
+                NotchloomSettingsHeader(
+                    title: pageInfo.title,
+                    description: pageInfo.description,
+                    symbol: pageInfo.symbol)
                 Group {
                 switch selectedTab {
                 case "General":
@@ -157,8 +187,6 @@ struct SettingsView: View {
                     Shelf()
                 case "Shortcuts":
                     Shortcuts()
-                case "Extensions":
-                    GeneralSettings()
                 case "Advanced":
                     Advanced()
                 case "About":
@@ -190,7 +218,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 700)
+        .frame(minWidth: 840, idealWidth: 860, minHeight: 620, idealHeight: 680)
         .background(NotchloomTheme.ink)
         .tint(NotchloomTheme.cyan)
         .accentColor(NotchloomTheme.cyan)
@@ -226,15 +254,17 @@ struct GeneralSettings: View {
 
     var body: some View {
         Form {
+            NotchBehaviour()
+
             Section {
                 Toggle(isOn: Binding(
                     get: { Defaults[.menubarIcon] },
                     set: { Defaults[.menubarIcon] = $0 }
                 )) {
-                    Text("Show menu bar icon")
+                    Text("Show Notchloom in the menu bar")
                 }
                 .tint(NotchloomTheme.cyan)
-                LaunchAtLogin.Toggle("Launch at login")
+                LaunchAtLogin.Toggle("Launch Notchloom at login")
                 Defaults.Toggle(key: .showOnAllDisplays) {
                     Text("Show on all displays")
                 }
@@ -242,36 +272,38 @@ struct GeneralSettings: View {
                     NotificationCenter.default.post(
                         name: Notification.Name.showOnAllDisplaysChanged, object: nil)
                 }
-                Picker("Preferred display", selection: $coordinator.preferredScreenUUID) {
-                    ForEach(screens, id: \.uuid) { screen in
-                        Text(screen.name).tag(screen.uuid as String?)
+                if !showOnAllDisplays {
+                    Picker("Preferred display", selection: $coordinator.preferredScreenUUID) {
+                        ForEach(screens, id: \.uuid) { screen in
+                            Text(screen.name).tag(screen.uuid as String?)
+                        }
                     }
-                }
-                .onChange(of: NSScreen.screens) {
-                    screens = NSScreen.screens.compactMap { screen in
-                        guard let uuid = screen.displayUUID else { return nil }
-                        return (uuid, screen.localizedName)
+                    .onChange(of: NSScreen.screens) {
+                        screens = NSScreen.screens.compactMap { screen in
+                            guard let uuid = screen.displayUUID else { return nil }
+                            return (uuid, screen.localizedName)
+                        }
                     }
-                }
-                .disabled(showOnAllDisplays)
-                
-                Defaults.Toggle(key: .automaticallySwitchDisplay) {
-                    Text("Automatically switch displays")
-                }
+                    Defaults.Toggle(key: .automaticallySwitchDisplay) {
+                        Text("Follow the active display")
+                    }
                     .onChange(of: automaticallySwitchDisplay) {
                         NotificationCenter.default.post(
                             name: Notification.Name.automaticallySwitchDisplayChanged, object: nil)
                     }
-                    .disabled(showOnAllDisplays)
+                }
             } header: {
-                Text("System features")
+                Text("Launch and displays")
+            } footer: {
+                Text(showOnAllDisplays
+                     ? "Turn off Show on all displays to choose a preferred display."
+                     : "Choose a preferred display, or follow the active display automatically.")
             }
 
             Section {
                 Picker(
                     selection: $notchHeightMode,
-                    label:
-                        Text("Notch height on notch displays")
+                    label: Text("On a Mac with a notch")
                 ) {
                     Text("Match real notch height")
                         .tag(WindowHeightMode.matchRealNotchSize)
@@ -294,14 +326,14 @@ struct GeneralSettings: View {
                 }
                 if notchHeightMode == .custom {
                     Slider(value: $notchHeight, in: 15...45, step: 1) {
-                        Text("Custom notch size - \(notchHeight, specifier: "%.0f")")
+                        Text("Height: \(notchHeight, specifier: "%.0f") pt")
                     }
                     .onChange(of: notchHeight) {
                         NotificationCenter.default.post(
                             name: Notification.Name.notchHeightChanged, object: nil)
                     }
                 }
-                Picker("Notch height on non-notch displays", selection: $nonNotchHeightMode) {
+                Picker("On other displays", selection: $nonNotchHeightMode) {
                     Text("Match menubar height")
                         .tag(WindowHeightMode.matchMenuBar)
                     Text("Match real notch height")
@@ -323,7 +355,7 @@ struct GeneralSettings: View {
                 }
                 if nonNotchHeightMode == .custom {
                     Slider(value: $nonNotchHeight, in: 0...40, step: 1) {
-                        Text("Custom notch size - \(nonNotchHeight, specifier: "%.0f")")
+                        Text("Height: \(nonNotchHeight, specifier: "%.0f") pt")
                     }
                     .onChange(of: nonNotchHeight) {
                         NotificationCenter.default.post(
@@ -331,18 +363,12 @@ struct GeneralSettings: View {
                     }
                 }
             } header: {
-                Text("Notch sizing")
+                Text("Notch height")
+            } footer: {
+                Text("Automatic sizes match the physical notch or menu bar. Choose Custom height to set your own size.")
             }
-
-            NotchBehaviour()
 
             gestureControls()
-        }
-        .toolbar {
-            Button("Quit app") {
-                NSApp.terminate(self)
-            }
-            .controlSize(.extraLarge)
         }
         .tint(NotchloomTheme.cyan)
         .onChange(of: openNotchOnHover) {
@@ -358,12 +384,9 @@ struct GeneralSettings: View {
             Defaults.Toggle(key: .enableGestures) {
                 Text("Enable gestures")
             }
-                .disabled(!openNotchOnHover)
             if enableGestures {
-                Toggle("Change media with horizontal gestures", isOn: .constant(false))
-                    .disabled(true)
                 Defaults.Toggle(key: .closeGestureEnabled) {
-                    Text("Close gesture")
+                    Text("Swipe up to close the notch")
                 }
                 Slider(value: $gestureSensitivity, in: 100...300, step: 100) {
                     HStack {
@@ -379,16 +402,11 @@ struct GeneralSettings: View {
             }
         } header: {
             HStack {
-                Text("Gesture control")
+                Text("Trackpad gestures")
                 customBadge(text: "Beta")
             }
         } footer: {
-            Text(
-                "Two-finger swipe up on notch to close, two-finger swipe down on notch to open when **Open notch on hover** option is disabled"
-            )
-            .multilineTextAlignment(.trailing)
-            .foregroundStyle(.secondary)
-            .font(.caption)
+            Text("Swipe up with two fingers to close the notch. When hover opening is off, swipe down to open it.")
         }
     }
 
@@ -396,12 +414,15 @@ struct GeneralSettings: View {
     func NotchBehaviour() -> some View {
         Section {
             Defaults.Toggle(key: .openNotchOnHover) {
-                Text("Open notch on hover")
+                Text("Open when the pointer reaches the notch")
+            }
+            Defaults.Toggle(key: .extendHoverArea) {
+                Text("Use a wider hover area")
             }
             Defaults.Toggle(key: .enableHaptics) {
-                    Text("Enable haptic feedback")
+                Text("Use haptic feedback")
             }
-            Toggle("Remember last tab", isOn: $coordinator.openLastTabByDefault)
+            Toggle("Reopen the last tab", isOn: $coordinator.openLastTabByDefault)
             if openNotchOnHover {
                 Slider(value: $minimumHoverDuration, in: 0...1, step: 0.1) {
                     HStack {
@@ -417,7 +438,9 @@ struct GeneralSettings: View {
                 }
             }
         } header: {
-            Text("Notch behavior")
+            Text("Opening and closing")
+        } footer: {
+            Text("Notchloom opens as soon as you hover by default. Raise the delay if it opens by accident.")
         }
     }
 }
@@ -433,7 +456,9 @@ struct Charge: View {
                     Text("Show power status notifications")
                 }
             } header: {
-                Text("General")
+                Text("Battery indicator")
+            } footer: {
+                Text("Choose whether Notchloom shows battery status beside the notch and alerts you when power changes.")
             }
             Section {
                 Defaults.Toggle(key: .showBatteryPercentage) {
@@ -443,7 +468,7 @@ struct Charge: View {
                     Text("Show power status icons")
                 }
             } header: {
-                Text("Battery Information")
+                Text("Battery details")
             }
         }
         .onAppear {
@@ -581,7 +606,7 @@ struct HUD: View {
             }
             
             Section {
-                Picker("Option key behaviour", selection: $optionKeyAction) {
+                Picker("Option + media key action", selection: $optionKeyAction) {
                     ForEach(OptionKeyAction.allCases) { opt in
                         Text(opt.rawValue).tag(opt)
                     }
@@ -600,7 +625,9 @@ struct HUD: View {
                     Text("Tint progress bar with accent color")
                 }
             } header: {
-                Text("General")
+                Text("HUD appearance")
+            } footer: {
+                Text("Choose what happens when you hold Option while pressing a volume or brightness key.")
             }
             .disabled(!hudReplacement)
             
@@ -614,7 +641,7 @@ struct HUD: View {
                 .disabled(!Defaults[.showOpenNotchHUD])
             } header: {
                 HStack {
-                    Text("Open Notch")
+                    Text("When the notch is open")
                     customBadge(text: "Beta")
                 }
             }
@@ -640,7 +667,7 @@ struct HUD: View {
                     Text("Show percentage")
                 }
             } header: {
-                Text("Closed Notch")
+                Text("When the notch is closed")
             }
             .disabled(!Defaults[.hudReplacement])
         }
@@ -677,7 +704,7 @@ struct Media: View {
     var body: some View {
         Form {
             Section {
-                Picker("Music Source", selection: $mediaController) {
+                Picker("Music source", selection: $mediaController) {
                     ForEach(availableMediaControllers) { controller in
                         Text(controller.rawValue).tag(controller)
                     }
@@ -689,7 +716,7 @@ struct Media: View {
                     )
                 }
             } header: {
-                Text("Media Source")
+                Text("Playback source")
             } footer: {
                 if MusicManager.shared.isNowPlayingDeprecated {
                     HStack {
@@ -704,9 +731,7 @@ struct Media: View {
                         .foregroundColor(.blue)  // Ensures it's visibly a link
                     }
                 } else {
-                    Text(
-                        "'Now Playing' was the only option on previous versions and works with all media apps."
-                    )
+                    Text("Now Playing receives playback information from supported media apps.")
                     .foregroundStyle(.secondary)
                     .font(.caption)
                 }
@@ -718,9 +743,11 @@ struct Media: View {
                     isOn: $coordinator.musicLiveActivityEnabled.animation()
                 )
                 Toggle("Show sneak peek on playback changes", isOn: $enableSneakPeek)
-                Picker("Sneak Peek Style", selection: $sneakPeekStyles) {
-                    ForEach(SneakPeekStyle.allCases) { style in
-                        Text(style.rawValue).tag(style)
+                if enableSneakPeek {
+                    Picker("Sneak Peek style", selection: $sneakPeekStyles) {
+                        ForEach(SneakPeekStyle.allCases) { style in
+                            Text(style.rawValue).tag(style)
+                        }
                     }
                 }
                 HStack {
@@ -747,7 +774,9 @@ struct Media: View {
                     Text("Never hide").tag(HideNotchOption.never)
                 }
             } header: {
-                Text("Media playback live activity")
+                Text("Playback display")
+            } footer: {
+                Text("Sneak Peek briefly shows the song and artist when playback changes.")
             }
             
             Section {
@@ -788,28 +817,39 @@ struct CalendarSettings: View {
 
     var body: some View {
         Form {
-            Defaults.Toggle(key: .showCalendar) {
-                Text("Show calendar")
+            Section {
+                Defaults.Toggle(key: .showCalendar) {
+                    Text("Show events and reminders in the notch")
+                }
+            } header: {
+                Text("Calendar in Notchloom")
+            } footer: {
+                Text("Turn this on to choose calendars and reminder lists. Calendar and Reminders access is managed in System Settings.")
             }
-            Defaults.Toggle(key: .hideCompletedReminders) {
-                Text("Hide completed reminders")
-            }
-            Defaults.Toggle(key: .hideAllDayEvents) {
-                Text("Hide all-day events")
-            }
-            Defaults.Toggle(key: .autoScrollToNextEvent) {
-                Text("Auto-scroll to next event")
-            }
-            Defaults.Toggle(key: .showFullEventTitles) {
-                Text("Always show full event titles")
-            }
+            if showCalendar {
+                Section {
+                    Defaults.Toggle(key: .hideCompletedReminders) {
+                        Text("Hide completed reminders")
+                    }
+                    Defaults.Toggle(key: .hideAllDayEvents) {
+                        Text("Hide all-day events")
+                    }
+                    Defaults.Toggle(key: .autoScrollToNextEvent) {
+                        Text("Scroll to the next event automatically")
+                    }
+                    Defaults.Toggle(key: .showFullEventTitles) {
+                        Text("Always show full event titles")
+                    }
+                } header: {
+                    Text("Event display")
+                }
             Section(header: Text("Calendars")) {
                 if calendarManager.calendarAuthorizationStatus != .fullAccess {
-                    Text("Calendar access is denied. Please enable it in System Settings.")
-                        .foregroundColor(.red)
+                    Text("Allow Calendar access in System Settings to choose which calendars appear.")
+                        .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .padding()
-                    Button("Open Calendar Settings") {
+                    Button("Open Calendar Privacy Settings") {
                         if let settingsURL = URL(
                             string:
                                 "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars"
@@ -841,11 +881,11 @@ struct CalendarSettings: View {
             }
             Section(header: Text("Reminders")) {
                 if calendarManager.reminderAuthorizationStatus != .fullAccess {
-                    Text("Reminder access is denied. Please enable it in System Settings.")
-                        .foregroundColor(.red)
+                    Text("Allow Reminders access in System Settings to choose which lists appear.")
+                        .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .padding()
-                    Button("Open Reminder Settings") {
+                    Button("Open Reminders Privacy Settings") {
                         if let settingsURL = URL(
                             string:
                                 "x-apple.systempreferences:com.apple.preference.security?Privacy_Reminders"
@@ -874,6 +914,7 @@ struct CalendarSettings: View {
                         }
                     }
                 }
+            }
             }
         }
         .tint(NotchloomTheme.cyan)
@@ -1003,7 +1044,7 @@ struct About: View {
 }
 
 struct Shelf: View {
-    
+    @Default(.boringShelf) private var shelfEnabled
     @Default(.shelfTapToOpen) var shelfTapToOpen: Bool
     @Default(.quickShareProvider) var quickShareProvider
     @Default(.expandedDragDetection) var expandedDragDetection: Bool
@@ -1021,8 +1062,16 @@ struct Shelf: View {
         Form {
             Section {
                 Defaults.Toggle(key: .boringShelf) {
-                    Text("Enable shelf")
+                    Text("Show the file shelf in the notch")
                 }
+            } header: {
+                Text("File shelf")
+            } footer: {
+                Text("Keep files at the top of your screen for quick access and sharing.")
+            }
+
+            if shelfEnabled {
+            Section {
                 Defaults.Toggle(key: .openShelfByDefault) {
                     Text("Open shelf by default if items are present")
                 }
@@ -1043,9 +1092,7 @@ struct Shelf: View {
                 }
 
             } header: {
-                HStack {
-                    Text("General")
-                }
+                Text("Shelf behavior")
             }
             
             Section {
@@ -1104,6 +1151,7 @@ struct Shelf: View {
                 Text("Choose which service to use when sharing files from the shelf. Click the shelf button to select files, or drag files onto it to share immediately.")
                     .font(.caption)
                     .foregroundColor(.secondary)
+            }
             }
         }
         .tint(NotchloomTheme.cyan)
@@ -1257,33 +1305,32 @@ struct Appearance: View {
     @Default(.customVisualizers) var customVisualizers
     @Default(.selectedVisualizer) var selectedVisualizer
 
-    let icons: [String] = ["logo2"]
-    @State private var selectedIcon: String = "logo2"
     @State private var selectedListVisualizer: CustomVisualizer? = nil
     @State private var isPresented: Bool = false
     @State private var name: String = ""
     @State private var url: String = ""
     @State private var speed: CGFloat = 1.0
+    @State private var showExperimentalVisualizers = false
     var body: some View {
         Form {
             Section {
-                Toggle("Always show tabs", isOn: $coordinator.alwaysShowTabs)
+                Toggle("Always show tabs in the open notch", isOn: $coordinator.alwaysShowTabs)
                 Defaults.Toggle(key: .settingsIconInNotch) {
-                    Text("Show settings icon in notch")
+                    Text("Show the Settings button in the notch")
                 }
 
             } header: {
-                Text("General")
+                Text("Notch layout")
             }
 
             Section {
                 Defaults.Toggle(key: .coloredSpectrogram) {
-                    Text("Colored spectrogram")
+                    Text("Use colors in the music visualizer")
                 }
                 Defaults
-                    .Toggle("Player tinting", key: .playerColorTinting)
+                    .Toggle("Tint the player with album artwork", key: .playerColorTinting)
                 Defaults.Toggle(key: .lightingEffect) {
-                    Text("Enable blur effect behind album art")
+                    Text("Blur behind album artwork")
                 }
                 Picker("Slider color", selection: $sliderColor) {
                     ForEach(SliderColorEnum.allCases, id: \.self) { option in
@@ -1291,9 +1338,36 @@ struct Appearance: View {
                     }
                 }
             } header: {
-                Text("Media")
+                Text("Music player")
             }
 
+            Section {
+                Defaults.Toggle(key: .showMirror) {
+                    Text("Show camera mirror")
+                }
+                .disabled(!checkVideoInput())
+                Picker("Mirror shape", selection: $mirrorShape) {
+                    Text("Circle").tag(MirrorShapeEnum.circle)
+                    Text("Square").tag(MirrorShapeEnum.rectangle)
+                }
+                Defaults.Toggle(key: .showNotHumanFace) {
+                    Text("Show the idle face animation")
+                }
+            } header: {
+                Text("Mirror and idle view")
+            } footer: {
+                Text("The mirror needs camera access. Notchloom uses the camera only while the mirror is open.")
+            }
+
+            Section {
+                Toggle("Show experimental visualizer controls", isOn: $showExperimentalVisualizers)
+            } header: {
+                Text("Experimental")
+            } footer: {
+                Text("Custom animation support is still in development.")
+            }
+
+            if showExperimentalVisualizers {
             Section {
                 Toggle(
                     "Use music visualizer spectrogram",
@@ -1460,33 +1534,15 @@ struct Appearance: View {
                 }
             } header: {
                 HStack(spacing: 0) {
-                    Text("Custom vizualizers (Lottie)")
+                    Text("Custom visualizers (Lottie)")
                     if !Defaults[.customVisualizers].isEmpty {
                         Text(" – \(Defaults[.customVisualizers].count)")
                             .foregroundStyle(.secondary)
                     }
                 }
             }
-
-            Section {
-                Defaults.Toggle(key: .showMirror) {
-                    Text("Enable boring mirror")
-                }
-                    .disabled(!checkVideoInput())
-                Picker("Mirror shape", selection: $mirrorShape) {
-                    Text("Circle")
-                        .tag(MirrorShapeEnum.circle)
-                    Text("Square")
-                        .tag(MirrorShapeEnum.rectangle)
-                }
-                Defaults.Toggle(key: .showNotHumanFace) {
-                    Text("Show cool face animation while inactive")
-                }
-            } header: {
-                HStack {
-                    Text("Additional features")
-                }
             }
+
         }
         .tint(NotchloomTheme.cyan)
     }
@@ -1503,14 +1559,11 @@ struct Appearance: View {
 struct Advanced: View {
     @Default(.useCustomAccentColor) var useCustomAccentColor
     @Default(.customAccentColorData) var customAccentColorData
-    @Default(.extendHoverArea) var extendHoverArea
     @Default(.showOnLockScreen) var showOnLockScreen
     @Default(.hideFromScreenRecording) var hideFromScreenRecording
     
     @State private var customAccentColor: Color = .accentColor
     @State private var selectedPresetColor: PresetAccentColor? = nil
-    let icons: [String] = ["logo2"]
-    @State private var selectedIcon: String = "logo2"
     
     // macOS accent colors
     enum PresetAccentColor: String, CaseIterable, Identifiable {
@@ -1656,68 +1709,21 @@ struct Advanced: View {
                     Text("Corner radius scaling")
                 }
             } header: {
-                Text("Window Appearance")
+                Text("Window appearance")
             }
             
             Section {
-                HStack {
-                    ForEach(icons, id: \.self) { icon in
-                        Spacer()
-                        VStack {
-                            Image(icon)
-                                .resizable()
-                                .frame(width: 80, height: 80)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 20, style: .circular)
-                                        .strokeBorder(
-                                            icon == selectedIcon ? Color.effectiveAccent : .clear,
-                                            lineWidth: 2.5
-                                        )
-                                )
-
-                            Text("Default")
-                                .fontWeight(.medium)
-                                .font(.caption)
-                                .foregroundStyle(icon == selectedIcon ? .white : .secondary)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 3)
-                                .background(
-                                    Capsule()
-                                        .fill(icon == selectedIcon ? Color.effectiveAccent : .clear)
-                                )
-                        }
-                        .onTapGesture {
-                            withAnimation {
-                                selectedIcon = icon
-                            }
-                            NSApp.applicationIconImage = NSImage(named: icon)
-                        }
-                        Spacer()
-                    }
-                }
-                .disabled(true)
-            } header: {
-                HStack {
-                    Text("App icon")
-                    customBadge(text: "Coming soon")
-                }
-            }
-            
-            Section {
-                Defaults.Toggle(key: .extendHoverArea) {
-                    Text("Extend hover area")
-                }
                 Defaults.Toggle(key: .hideTitleBar) {
-                    Text("Hide title bar")
+                    Text("Cover the menu bar behind the notch")
                 }
                 Defaults.Toggle(key: .showOnLockScreen) {
-                    Text("Show notch on lock screen")
+                    Text("Show Notchloom on the lock screen")
                 }
                 Defaults.Toggle(key: .hideFromScreenRecording) {
                     Text("Hide from screen recording")
                 }
             } header: {
-                Text("Window Behavior")
+                Text("Visibility")
             }
         }
         .tint(NotchloomTheme.cyan)
@@ -1816,19 +1822,12 @@ struct Shortcuts: View {
     var body: some View {
         Form {
             Section {
-                KeyboardShortcuts.Recorder("Toggle Sneak Peek:", name: .toggleSneakPeek)
+                KeyboardShortcuts.Recorder("Show or hide Sneak Peek", name: .toggleSneakPeek)
+                KeyboardShortcuts.Recorder("Open or close the notch", name: .toggleNotchOpen)
             } header: {
-                Text("Media")
+                Text("Keyboard shortcuts")
             } footer: {
-                Text(
-                    "Sneak Peek shows the media title and artist under the notch for a few seconds."
-                )
-                .multilineTextAlignment(.trailing)
-                .foregroundStyle(.secondary)
-                .font(.caption)
-            }
-            Section {
-                KeyboardShortcuts.Recorder("Toggle Notch Open:", name: .toggleNotchOpen)
+                Text("Click a shortcut field, then press the keys you want to use. Sneak Peek briefly shows the current song and artist.")
             }
         }
         .tint(NotchloomTheme.cyan)

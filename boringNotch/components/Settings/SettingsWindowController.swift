@@ -16,7 +16,7 @@ class SettingsWindowController: NSWindowController {
     
     private init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 700, height: 600),
+            contentRect: NSRect(x: 0, y: 0, width: 860, height: 680),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -41,6 +41,7 @@ class SettingsWindowController: NSWindowController {
         guard let window = window else { return }
         
         window.title = "Notchloom Settings"
+        window.minSize = NSSize(width: 840, height: 620)
         window.titlebarAppearsTransparent = false
         window.titleVisibility = .visible
         window.toolbarStyle = .unified
