@@ -143,6 +143,22 @@ struct ContentView: View {
                     .onTapGesture {
                         if notificationMirror.current == nil { doOpen() }
                     }
+                    .background(HorizontalTabSwipeMonitor { direction in
+                        guard Defaults[.enableGestures], vm.notchState == .open,
+                              notificationMirror.current == nil else { return }
+                        let next: NotchViews
+                        switch (direction, coordinator.currentView) {
+                        case (.left, .home): next = .tools
+                        case (.left, .tools) where Defaults[.boringShelf]: next = .shelf
+                        case (.right, .shelf): next = .tools
+                        case (.right, .tools): next = .home
+                        default: return
+                        }
+                        withAnimation(.snappy(duration: 0.28, extraBounce: 0)) {
+                            coordinator.currentView = next
+                        }
+                        if Defaults[.enableHaptics] { haptics.toggle() }
+                    })
                     .conditionalModifier(Defaults[.enableGestures]) { view in
                         view
                             .panGesture(direction: .down) { translation, phase in
@@ -308,7 +324,7 @@ struct ContentView: View {
                           BoringFaceAnimation()
                        } else if vm.notchState == .open {
                            BoringHeader()
-                               .frame(height: max(24, vm.effectiveClosedNotchHeight))
+                               .frame(height: max(24, vm.effectiveClosedNotchHeight) + 34)
                                .opacity(gestureProgress != 0 ? 1.0 - min(abs(gestureProgress) * 0.1, 0.3) : 1.0)
                        } else {
                            Rectangle().fill(.clear).frame(width: vm.closedNotchSize.width - 20, height: vm.effectiveClosedNotchHeight)
@@ -363,8 +379,10 @@ struct ContentView: View {
                         NotchHomeView(albumArtNamespace: albumArtNamespace)
                     case .tools:
                         NotchToolsView()
+                            .transition(.opacity)
                     case .shelf:
                         ShelfView()
+                            .transition(.opacity)
                     }
                 }
                 .transition(

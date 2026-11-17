@@ -13,36 +13,44 @@ struct BoringHeader: View {
     @ObservedObject var batteryModel = BatteryStatusViewModel.shared
     @ObservedObject var coordinator = BoringViewCoordinator.shared
     @StateObject var tvm = ShelfStateViewModel.shared
+    private var showsTabs: Bool {
+        coordinator.alwaysShowTabs || (!tvm.isEmpty && Defaults[.boringShelf])
+            || coordinator.currentView == .tools || coordinator.currentView == .shelf
+    }
+
     var body: some View {
-        HStack(spacing: 0) {
-            HStack {
-                if coordinator.alwaysShowTabs || (!tvm.isEmpty && Defaults[.boringShelf]) || coordinator.currentView == .tools {
-                    TabSelectionView()
-                } else if vm.notchState == .open {
-                    EmptyView()
+        VStack(spacing: 2) {
+            HStack(spacing: 0) {
+                Spacer(minLength: 0)
+                if vm.notchState == .open {
+                    Rectangle()
+                        .fill(NSScreen.screen(withUUID: coordinator.selectedScreenUUID)?.safeAreaInsets.top ?? 0 > 0 ? .black : .clear)
+                        .frame(width: vm.closedNotchSize.width)
+                        .mask { NotchShape() }
                 }
+                utilityButtons
+                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .opacity(vm.notchState == .closed ? 0 : 1)
-            .blur(radius: vm.notchState == .closed ? 20 : 0)
-            .zIndex(2)
+            .frame(height: max(24, vm.effectiveClosedNotchHeight))
 
-            if vm.notchState == .open {
-                Rectangle()
-                    .fill(NSScreen.screen(withUUID: coordinator.selectedScreenUUID)?.safeAreaInsets.top ?? 0 > 0 ? .black : .clear)
-                    .frame(width: vm.closedNotchSize.width)
-                    .mask {
-                        NotchShape()
-                    }
+            if vm.notchState == .open && showsTabs {
+                TabSelectionView()
+                    .frame(maxWidth: .infinity)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
+        }
+        .foregroundColor(.gray)
+        .environmentObject(vm)
+    }
 
-            HStack(spacing: 4) {
+    private var utilityButtons: some View {
+        HStack(spacing: 4) {
                 if vm.notchState == .open {
                     if isHUDType(coordinator.sneakPeek.type) && coordinator.sneakPeek.show && Defaults[.showOpenNotchHUD] {
                         OpenNotchHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon)
                             .transition(.scale(scale: 0.8).combined(with: .opacity))
                     } else {
-                        if !coordinator.alwaysShowTabs && (tvm.isEmpty || !Defaults[.boringShelf]) {
+                        if !showsTabs {
                             Button {
                                 withAnimation(.smooth) { coordinator.currentView = .tools }
                             } label: {
@@ -51,7 +59,7 @@ struct BoringHeader: View {
                                     .frame(width: 30, height: 30)
                             }
                             .buttonStyle(.plain)
-                            .help("Open tools")
+                            .help("Open Overview")
                         }
                         if Defaults[.showMirror] {
                             Button(action: {
@@ -102,15 +110,11 @@ struct BoringHeader: View {
                         }
                     }
                 }
-            }
-            .font(.system(.headline, design: .rounded))
-            .frame(maxWidth: .infinity, alignment: .trailing)
-            .opacity(vm.notchState == .closed ? 0 : 1)
-            .blur(radius: vm.notchState == .closed ? 20 : 0)
-            .zIndex(2)
         }
-        .foregroundColor(.gray)
-        .environmentObject(vm)
+        .font(.system(.headline, design: .rounded))
+        .opacity(vm.notchState == .closed ? 0 : 1)
+        .blur(radius: vm.notchState == .closed ? 20 : 0)
+        .zIndex(2)
     }
 
     func isHUDType(_ type: SneakContentType) -> Bool {

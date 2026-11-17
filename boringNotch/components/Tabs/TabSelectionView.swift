@@ -9,7 +9,7 @@ import Defaults
 import SwiftUI
 
 struct TabModel: Identifiable {
-    let id = UUID()
+    var id: NotchViews { view }
     let label: String
     let icon: String
     let view: NotchViews
@@ -17,41 +17,55 @@ struct TabModel: Identifiable {
 
 let tabs = [
     TabModel(label: "Home", icon: "house.fill", view: .home),
-    TabModel(label: "Tools", icon: "square.grid.2x2.fill", view: .tools),
+    TabModel(label: "Overview", icon: "square.grid.2x2.fill", view: .tools),
     TabModel(label: "Shelf", icon: "tray.fill", view: .shelf)
 ]
 
 struct TabSelectionView: View {
     @ObservedObject var coordinator = BoringViewCoordinator.shared
     @Default(.boringShelf) private var shelfEnabled
-    @Namespace var animation
+    @Namespace private var selectionAnimation
+
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 2) {
             ForEach(tabs) { tab in
                 if tab.view != .shelf || shelfEnabled {
-                    TabButton(label: tab.label, icon: tab.icon, selected: coordinator.currentView == tab.view) {
-                        withAnimation(.smooth) {
+                    Button {
+                        withAnimation(.snappy(duration: 0.28, extraBounce: 0)) {
                             coordinator.currentView = tab.view
                         }
+                    } label: {
+                        Label(tab.label, systemImage: tab.icon)
+                            .labelStyle(.titleAndIcon)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(coordinator.currentView == tab.view ? .white : .white.opacity(0.68))
+                            .frame(minWidth: 112, minHeight: 29)
+                            .contentShape(Capsule())
                     }
-                    .frame(height: 26)
-                    .foregroundStyle(tab.view == coordinator.currentView ? Color.white : Color.gray)
+                    .buttonStyle(.plain)
                     .background {
-                        if tab.view == coordinator.currentView {
+                        if coordinator.currentView == tab.view {
                             Capsule()
-                                .fill(coordinator.currentView == tab.view ? Color(nsColor: .secondarySystemFill) : Color.clear)
-                                .matchedGeometryEffect(id: "capsule", in: animation)
-                        } else {
-                            Capsule()
-                                .fill(coordinator.currentView == tab.view ? Color(nsColor: .secondarySystemFill) : Color.clear)
-                                .matchedGeometryEffect(id: "capsule", in: animation)
-                                .hidden()
+                                .fill(.white.opacity(0.16))
+                                .matchedGeometryEffect(id: "selectedTab", in: selectionAnimation)
                         }
                     }
+                    .accessibilityAddTraits(coordinator.currentView == tab.view ? .isSelected : [])
                 }
             }
         }
-        .clipShape(Capsule())
+        .padding(3)
+        .background(.white.opacity(0.07), in: Capsule())
+        .fixedSize(horizontal: true, vertical: false)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Notch view")
+        .onChange(of: shelfEnabled) { _, enabled in
+            if !enabled && coordinator.currentView == .shelf {
+                withAnimation(.snappy(duration: 0.28, extraBounce: 0)) {
+                    coordinator.currentView = .home
+                }
+            }
+        }
     }
 }
 

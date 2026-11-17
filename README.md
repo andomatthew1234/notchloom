@@ -24,6 +24,7 @@ Notchloom is a macOS notch utility built from [Boring Notch](https://github.com/
 ## What it does
 
 - **Music at a glance.** See artwork and playback status, use configurable controls, and show lyrics when available.
+- **Simple navigation.** Centered Home and Overview tabs combine icons with names; swipe across the open notch to move between them and the optional Shelf.
 - **A custom system HUD.** Show volume, brightness, and keyboard backlight changes in the notch, including a compact inline view when closed.
 - **Notifications from the notch.** The notch itself expands into one continuous black surface for visible macOS banners. Compact text, staged spring motion, hover pausing, and a queue keep alerts readable. Clock alerts stay visible longer; original macOS actions remain available.
 - **Focus time.** Start a 5, 15, 25, or 50 minute session, pause it, and see a quiet completion card. The timer survives app restarts.

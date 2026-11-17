@@ -418,7 +418,7 @@ struct GeneralSettings: View {
                 customBadge(text: "Beta")
             }
         } footer: {
-            Text("Swipe up with two fingers to close the notch. When hover opening is off, swipe down to open it.")
+            Text("Swipe left or right across the open notch to move between Home, Overview, and Shelf when enabled. Swipe up to close it. When hover opening is off, swipe down to open it.")
         }
     }
 

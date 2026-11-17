@@ -143,3 +143,83 @@ private struct ScrollMonitor: NSViewRepresentable {
         }
     }
 }
+
+/// Trackpad-only page navigation. A SwiftUI DragGesture here would compete with
+/// the music scrubber and other controls inside the open notch.
+struct HorizontalTabSwipeMonitor: NSViewRepresentable {
+    let onSwipe: (PanDirection) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        context.coordinator.install(on: view)
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.onSwipe = onSwipe
+    }
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        coordinator.remove()
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(onSwipe: onSwipe) }
+
+    @MainActor final class Coordinator {
+        var onSwipe: (PanDirection) -> Void
+        private var monitor: Any?
+        private var resetTask: Task<Void, Never>?
+        private var distance: CGFloat = 0
+        private var handled = false
+
+        init(onSwipe: @escaping (PanDirection) -> Void) { self.onSwipe = onSwipe }
+
+        func install(on view: NSView) {
+            remove()
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self, weak view] event in
+                guard let self, let view, event.window === view.window,
+                      view.bounds.contains(view.convert(event.locationInWindow, from: nil)),
+                      event.hasPreciseScrollingDeltas else { return event }
+                self.handle(event)
+                return event
+            }
+        }
+
+        func remove() {
+            if let monitor { NSEvent.removeMonitor(monitor) }
+            monitor = nil
+            reset()
+        }
+
+        private func reset() {
+            resetTask?.cancel()
+            resetTask = nil
+            distance = 0
+            handled = false
+        }
+
+        private func handle(_ event: NSEvent) {
+            if event.phase.contains(.ended) || event.phase.contains(.cancelled) {
+                reset()
+                return
+            }
+            guard event.momentumPhase.isEmpty, !handled else { return }
+            let dx = event.scrollingDeltaX
+            let dy = event.scrollingDeltaY
+            guard abs(dx) >= abs(dy) * 1.5, abs(dx) > 0.2 else { return }
+            if event.phase.contains(.began) { distance = 0 }
+            if distance != 0 && (distance > 0) != (dx > 0) { distance = 0 }
+            distance += dx
+            if abs(distance) >= 42 {
+                handled = true
+                onSwipe(distance < 0 ? .left : .right)
+            }
+            resetTask?.cancel()
+            resetTask = Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(300))
+                guard !Task.isCancelled else { return }
+                reset()
+            }
+        }
+    }
+}
