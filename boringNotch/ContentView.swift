@@ -111,9 +111,6 @@ struct ContentView: View {
                         : cornerRadiusInsets.closed.bottom
                     )
                     .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
-                    .conditionalModifier(vm.notchState == .closed) { view in
-                        view.fixedSize()
-                    }
                     .modifier(NotificationNotchSurface(
                         presentation: notificationMirror,
                         screenID: notificationScreenID,
@@ -121,7 +118,8 @@ struct ContentView: View {
                         topInset: notificationScreen?.safeAreaInsets.top ?? 0,
                         blocked: notificationBlocked,
                         normalShape: currentNotchShape,
-                        normalShadow: (vm.notchState == .open || isHovering) && Defaults[.enableShadow]
+                        normalShadow: (vm.notchState == .open || isHovering) && Defaults[.enableShadow],
+                        normalShadowRadius: Defaults[.cornerRadiusScaling] ? 6 : 4
                     ))
                     .padding(
                         .bottom,

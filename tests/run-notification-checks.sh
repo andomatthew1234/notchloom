@@ -6,5 +6,7 @@ trap 'rm -rf "$check_dir"' EXIT
 sources=(boringNotch/NotificationPresentation.swift boringNotch/components/Notch/NotchShape.swift)
 swiftc -parse-as-library "${sources[@]}" tests/NotificationPresentationTests.swift -o "$check_dir/checks"
 "$check_dir/checks"
+swiftc -parse-as-library "${sources[@]}" tests/NotchLayoutRegressionTests.swift -o "$check_dir/layout"
+"$check_dir/layout"
 swiftc -parse-as-library "${sources[@]}" tests/RenderNotificationSamples.swift -o "$check_dir/render"
 "$check_dir/render" "$PWD/dist/notification-redesign"

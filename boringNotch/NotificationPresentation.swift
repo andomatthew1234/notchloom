@@ -296,9 +296,39 @@ struct NotificationSurfaceMetrics {
     }
 }
 
-private struct NotchNaturalSizeKey: PreferenceKey {
+private struct NotchSurfaceSizeKey: PreferenceKey {
     static var defaultValue: CGSize = .zero
     static func reduce(value: inout CGSize, nextValue: () -> CGSize) { value = nextValue() }
+}
+
+/// Keep the original content's identity and size proposals unchanged. Only the
+/// surrounding surface morphs for a notification; its size must never be fed
+/// back into the hidden music/menu layout through a frame or GeometryReader.
+struct NotificationSurfaceLayout: Layout {
+    var progress: CGFloat
+    var notificationSize: CGSize
+
+    var animatableData: CGFloat {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let content = subviews.first else { return .zero }
+        let normal = content.sizeThatFits(proposal)
+        return CGSize(
+            width: normal.width + (notificationSize.width - normal.width) * progress,
+            height: normal.height + (notificationSize.height - normal.height) * progress
+        )
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews.first?.place(at: CGPoint(x: bounds.midX, y: bounds.minY), anchor: .top, proposal: proposal)
+    }
+
+    func spacing(subviews: Subviews, cache: inout ()) -> ViewSpacing {
+        subviews.first?.spacing ?? ViewSpacing()
+    }
 }
 
 /// Reuses the original notch's content, black fill and animatable NotchShape in its existing NSPanel.
@@ -310,7 +340,8 @@ struct NotificationNotchSurface: ViewModifier {
     let blocked: Bool
     let normalShape: NotchShape
     let normalShadow: Bool
-    @State private var naturalSize = CGSize(width: 185, height: 32)
+    var normalShadowRadius: CGFloat = 6
+    @State private var surfaceSize: CGSize = .zero
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var active: Bool { presentation.current != nil }
@@ -319,25 +350,18 @@ struct NotificationNotchSurface: ViewModifier {
         NotificationSurfaceMetrics(notification: presentation.current, screenWidth: screenFrame.width, topInset: topInset)
     }
     private var width: CGFloat { metrics.size.width }
-    private var height: CGFloat { metrics.size.height }
-    private var surfaceSize: CGSize { expanded ? CGSize(width: width, height: height) : naturalSize }
     private var hitFrame: CGRect {
         CGRect(x: screenFrame.midX - surfaceSize.width / 2, y: screenFrame.maxY - surfaceSize.height,
                width: surfaceSize.width, height: surfaceSize.height)
     }
 
     func body(content: Content) -> some View {
-        content
-            .background(GeometryReader { proxy in
-                Color.clear.preference(key: NotchNaturalSizeKey.self, value: proxy.size)
-            })
-            .onPreferenceChange(NotchNaturalSizeKey.self) { size in
-                if size.width > 0 && size.height >= 0 && size != naturalSize { naturalSize = size }
-            }
-            .opacity(active ? 0 : 1)
-            .animation(.easeOut(duration: 0.12), value: active)
-            .allowsHitTesting(!active)
-            .frame(width: active ? surfaceSize.width : nil, height: active ? surfaceSize.height : nil, alignment: .top)
+        NotificationSurfaceLayout(progress: expanded ? 1 : 0, notificationSize: metrics.size) {
+            content
+                .opacity(active ? 0 : 1)
+                .animation(.easeOut(duration: 0.12), value: active)
+                .allowsHitTesting(!active)
+        }
             .overlay(alignment: .top) {
                 if let item = presentation.current {
                     NotchNotificationContent(notification: item, receivedAt: presentation.receivedAt)
@@ -361,7 +385,16 @@ struct NotificationNotchSurface: ViewModifier {
             }
             .background(Color.black)
             .clipShape(expanded ? NotchShape(topCornerRadius: 6, bottomCornerRadius: 26) : normalShape)
-            .shadow(color: !active && normalShadow ? .black.opacity(0.7) : .clear, radius: 6)
+            .overlay(alignment: .top) {
+                Rectangle().fill(.black).frame(height: 1)
+                    .padding(.horizontal, expanded ? 6 : normalShape.topCornerRadius)
+                    .allowsHitTesting(false)
+            }
+            .shadow(color: !active && normalShadow ? .black.opacity(0.7) : .clear, radius: normalShadowRadius)
+            .background(GeometryReader { proxy in
+                Color.clear.preference(key: NotchSurfaceSizeKey.self, value: proxy.size)
+            })
+            .onPreferenceChange(NotchSurfaceSizeKey.self) { surfaceSize = $0 }
             .onAppear { reportSurface() }
             .onChange(of: blocked) { _, _ in reportSurface() }
             .onChange(of: hitFrame) { _, _ in reportSurface() }
