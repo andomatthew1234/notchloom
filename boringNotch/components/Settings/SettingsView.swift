@@ -12,14 +12,12 @@ import KeyboardShortcuts
 import LaunchAtLogin
 import Sparkle
 import SwiftUI
-import SwiftUIIntrospect
 
 private enum NotchloomTheme {
     static let cyan = Color(red: 0.20, green: 0.91, blue: 0.96)
-    static let violet = Color(red: 0.69, green: 0.43, blue: 0.98)
     static let ink = Color(red: 0.055, green: 0.065, blue: 0.11)
-    static let gradient = LinearGradient(
-        colors: [cyan, violet], startPoint: .leading, endPoint: .trailing)
+    static let settingsHeader = Color(red: 0.125, green: 0.13, blue: 0.15)
+    static let settingsSidebar = Color(red: 0.145, green: 0.15, blue: 0.17)
 }
 
 private struct NotchloomSettingsHeader: View {
@@ -28,40 +26,32 @@ private struct NotchloomSettingsHeader: View {
     let symbol: String
 
     var body: some View {
-        HStack(spacing: 15) {
+        HStack(spacing: 12) {
             Image(systemName: symbol)
-                .font(.system(size: 21, weight: .medium))
-                .foregroundStyle(NotchloomTheme.gradient)
-                .frame(width: 48, height: 48)
-                .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 13))
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(NotchloomTheme.cyan)
+                .frame(width: 34, height: 34)
+                .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 23, weight: .semibold, design: .rounded))
+                    .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(.white)
                 Text(description)
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.68))
+                    .font(.system(size: 12))
+                    .foregroundStyle(.white.opacity(0.62))
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
         }
         .padding(.horizontal, 24)
-        .padding(.vertical, 18)
-        .background {
-            NotchloomTheme.ink
-                .overlay(alignment: .trailing) {
-                    Circle()
-                        .fill(NotchloomTheme.violet.opacity(0.22))
-                        .frame(width: 170, height: 170)
-                        .blur(radius: 54)
-                        .offset(x: 20)
-                }
-        }
+        .padding(.vertical, 15)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(NotchloomTheme.settingsHeader)
         .overlay(alignment: .bottom) {
             Rectangle()
-                .fill(NotchloomTheme.gradient)
-                .frame(height: 2)
+                .fill(.white.opacity(0.09))
+                .frame(height: 1)
         }
         .accessibilityElement(children: .combine)
     }
@@ -128,83 +118,50 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            List(selection: $selectedTab) {
+        HStack(spacing: 0) {
+            List {
                 HStack(spacing: 10) {
                     Image("NotchloomIcon")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .frame(width: 42, height: 42)
+                        .frame(width: 36, height: 36)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Notchloom")
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .font(.system(size: 15, weight: .semibold))
                         Text("Your notch, woven in")
-                            .font(.caption)
+                            .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
                 }
-                .padding(.vertical, 12)
+                .padding(.vertical, 8)
                 .listRowBackground(Color.clear)
                 .accessibilityElement(children: .combine)
                 categoryRow(.general)
                 categoryRow(.appearance)
                 if expandedCategory == .appearance {
-                    NavigationLink(value: "Media") {
-                        Label("Now playing", systemImage: "music.note")
-                    }
-                    .padding(.leading, 16)
-                    NavigationLink(value: "NotchHeight") {
-                        Label("Notch height", systemImage: "arrow.up.and.down")
-                    }
-                    .padding(.leading, 16)
-                    NavigationLink(value: "HUD") {
-                        Label("Volume, battery & system HUDs", systemImage: "slider.horizontal.3")
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .padding(.leading, 16)
-                    NavigationLink(value: "Battery") {
-                        Label("Battery notch widget", systemImage: "battery.100.bolt")
-                    }
-                    .padding(.leading, 16)
+                    pageRow("Media", title: "Now playing", symbol: "music.note")
+                    pageRow("NotchHeight", title: "Notch height", symbol: "arrow.up.and.down")
+                    pageRow("HUD", title: "Volume, battery & system HUDs", symbol: "slider.horizontal.3")
+                    pageRow("Battery", title: "Battery notch widget", symbol: "battery.100.bolt")
                 }
                 categoryRow(.notchContent)
                 if expandedCategory == .notchContent {
-                    NavigationLink(value: "QuickApps") {
-                        Label("Quick apps", systemImage: "square.grid.2x2")
-                    }
-                    .padding(.leading, 16)
-                    NavigationLink(value: "Notifications") {
-                        Label("Notifications", systemImage: "bell.badge")
-                    }
-                    .padding(.leading, 16)
-                    NavigationLink(value: "Calendar") {
-                        Label("Calendar", systemImage: "calendar")
-                    }
-                    .padding(.leading, 16)
-                    NavigationLink(value: "Shelf") {
-                        Label("File shelf", systemImage: "square.stack.3d.up")
-                    }
-                    .padding(.leading, 16)
+                    pageRow("QuickApps", title: "Quick apps", symbol: "square.grid.2x2")
+                    pageRow("Notifications", title: "Notifications", symbol: "bell.badge")
+                    pageRow("Calendar", title: "Calendar", symbol: "calendar")
+                    pageRow("Shelf", title: "File shelf", symbol: "square.stack.3d.up")
                 }
                 categoryRow(.app)
                 if expandedCategory == .app {
-                    NavigationLink(value: "Shortcuts") {
-                        Label("Shortcuts", systemImage: "keyboard")
-                    }
-                    .padding(.leading, 16)
-                    NavigationLink(value: "Advanced") {
-                        Label("Advanced", systemImage: "gearshape.2")
-                    }
-                    .padding(.leading, 16)
-                    NavigationLink(value: "About") {
-                        Label("About", systemImage: "info.circle")
-                    }
-                    .padding(.leading, 16)
+                    pageRow("Shortcuts", title: "Shortcuts", symbol: "keyboard")
+                    pageRow("Advanced", title: "Advanced", symbol: "gearshape.2")
+                    pageRow("About", title: "About", symbol: "info.circle")
                 }
             }
             .listStyle(SidebarListStyle())
+            .scrollContentBackground(.hidden)
+            .background(NotchloomTheme.settingsSidebar)
             .safeAreaInset(edge: .bottom) {
                 Label("Changes save automatically", systemImage: "checkmark.circle")
                     .font(.caption)
@@ -212,13 +169,12 @@ struct SettingsView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 18)
                     .padding(.vertical, 12)
-                    .background(.ultraThinMaterial)
+                    .background(NotchloomTheme.settingsSidebar)
             }
             .tint(NotchloomTheme.cyan)
             .accentColor(NotchloomTheme.cyan)
-            .toolbar(removing: .sidebarToggle)
-            .navigationSplitViewColumnWidth(265)
-        } detail: {
+            .frame(width: 265)
+            Divider()
             VStack(spacing: 0) {
                 NotchloomSettingsHeader(
                     title: pageInfo.title,
@@ -265,20 +221,13 @@ struct SettingsView: View {
                 }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .id(selectedTab)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .navigationTitle("Notchloom Settings")
-        }
-        .navigationSplitViewStyle(.balanced)
-        .toolbar(removing: .sidebarToggle)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Text("")
-                    .frame(width: 0, height: 0)
-                    .accessibilityHidden(true)
-            }
         }
         .formStyle(.grouped)
+        .controlSize(.small)
+        .environment(\.defaultMinListRowHeight, 28)
         .frame(minWidth: 900, idealWidth: 940, minHeight: 620, idealHeight: 680)
         .background(NotchloomTheme.ink)
         .tint(NotchloomTheme.cyan)
@@ -314,10 +263,27 @@ struct SettingsView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.vertical, 5)
-        .listRowBackground(expandedCategory == category ? NotchloomTheme.cyan.opacity(0.12) : Color.clear)
+        .padding(.vertical, 3)
+        .listRowBackground(expandedCategory == category ? NotchloomTheme.cyan.opacity(0.10) : Color.clear)
         .accessibilityLabel(category.title)
         .accessibilityHint(category == .general ? "Open General settings" : "Expand settings category")
+    }
+
+    private func pageRow(_ page: String, title: String, symbol: String) -> some View {
+        Button {
+            selectedTab = page
+        } label: {
+            Label(title, systemImage: symbol)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.leading, 16)
+        .padding(.vertical, 3)
+        .listRowBackground(selectedTab == page ? NotchloomTheme.cyan.opacity(0.14) : Color.clear)
+        .accessibilityAddTraits(selectedTab == page ? .isSelected : [])
     }
 }
 
@@ -407,16 +373,10 @@ struct GeneralSettings: View {
                 Defaults.Toggle(key: .closeGestureEnabled) {
                     Text("Swipe up to close the notch")
                 }
-                Slider(value: $gestureSensitivity, in: 100...300, step: 100) {
-                    HStack {
-                        Text("Gesture sensitivity")
-                        Spacer()
-                        Text(
-                            Defaults[.gestureSensitivity] == 100
-                                ? "High" : Defaults[.gestureSensitivity] == 200 ? "Medium" : "Low"
-                        )
-                        .foregroundStyle(.secondary)
-                    }
+                Picker("Gesture sensitivity", selection: $gestureSensitivity) {
+                    Text("High").tag(CGFloat(100))
+                    Text("Medium").tag(CGFloat(200))
+                    Text("Low").tag(CGFloat(300))
                 }
             }
         } header: {
@@ -443,17 +403,12 @@ struct GeneralSettings: View {
             }
             Toggle("Reopen the last tab", isOn: $coordinator.openLastTabByDefault)
             if openNotchOnHover {
-                Slider(value: $minimumHoverDuration, in: 0...1, step: 0.1) {
-                    HStack {
-                        Text("Hover delay")
-                        Spacer()
-                        Text("\(minimumHoverDuration, specifier: "%.1f")s")
-                            .foregroundStyle(.secondary)
+                Picker("Hover delay", selection: $minimumHoverDuration) {
+                    Text("Instant").tag(TimeInterval(0))
+                    ForEach(1...10, id: \.self) { tenths in
+                        Text("\(Double(tenths) / 10, specifier: "%.1f") seconds")
+                            .tag(TimeInterval(tenths) / 10)
                     }
-                }
-                .onChange(of: minimumHoverDuration) {
-                    NotificationCenter.default.post(
-                        name: Notification.Name.notchHeightChanged, object: nil)
                 }
             }
         } header: {
@@ -677,22 +632,9 @@ struct HUD: View {
             }
 
             Section {
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Replace system HUD")
-                            .font(.headline)
-                        Text("Replaces the standard macOS volume, display brightness, and keyboard brightness HUDs with a custom design.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    Spacer(minLength: 40)
-                    Defaults.Toggle("", key: .hudReplacement)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .controlSize(.large)
+                Defaults.Toggle(key: .hudReplacement) {
+                    Text("Replace system HUD")
                 }
-                
                 if !accessibilityAuthorized {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Accessibility access is required to replace the system HUD.")
@@ -708,6 +650,10 @@ struct HUD: View {
                     }
                     .padding(.top, 6)
                 }
+            } header: {
+                Text("System HUD replacement")
+            } footer: {
+                Text("Replace the macOS volume and brightness overlays with Notchloom’s HUD.")
             }
             
             Section {
@@ -855,14 +801,12 @@ struct Media: View {
                         }
                     }
                 }
-                HStack {
-                    Stepper(value: $waitInterval, in: 0...10, step: 1) {
-                        HStack {
-                            Text("Media inactivity timeout")
-                            Spacer()
-                            Text("\(Defaults[.waitInterval], specifier: "%.0f") seconds")
-                                .foregroundStyle(.secondary)
-                        }
+                Stepper(value: $waitInterval, in: 0...10, step: 1) {
+                    HStack {
+                        Text("Media inactivity timeout")
+                        Spacer()
+                        Text("\(waitInterval, specifier: "%.0f") seconds")
+                            .foregroundStyle(.secondary)
                     }
                 }
                 Picker(
@@ -962,7 +906,7 @@ struct QuickAppsSettings: View {
             } header: {
                 Text("Favorites in the notch")
             } footer: {
-                Text("Keep up to four apps here. Open the notch and choose Tools to launch them.")
+                Text("Keep up to four apps here. Open the notch and choose Overview to launch them.")
             }
         }
         .tint(NotchloomTheme.cyan)
@@ -987,17 +931,16 @@ struct NotificationsSettings: View {
 
             if showNotificationBanners {
                 Section {
-                    Button("Preview in the notch") {
-                        NotificationMirror.shared.preview()
-                    }
-                    Button("Preview a Clock timer") {
-                        NotificationMirror.shared.previewClock(timer: true)
-                    }
-                    Button("Preview a Clock alarm") {
-                        NotificationMirror.shared.previewClock(timer: false)
-                    }
-                    Button("Preview short, long, and queued notifications") {
-                        NotificationMirror.shared.previewSequence()
+                    HStack(spacing: 12) {
+                        Button("Preview in the notch") {
+                            NotificationMirror.shared.preview()
+                        }
+                        Menu("More previews") {
+                            Button("Clock timer") { NotificationMirror.shared.previewClock(timer: true) }
+                            Button("Clock alarm") { NotificationMirror.shared.previewClock(timer: false) }
+                            Button("Short, long, and queued") { NotificationMirror.shared.previewSequence() }
+                        }
+                        Spacer()
                     }
                     if !accessibilityGranted {
                         Button("Request Accessibility access") {
@@ -1075,24 +1018,21 @@ struct CalendarSettings: View {
                         }
                     }
                 } else {
-                    List {
-                        ForEach(calendarManager.eventCalendars, id: \.id) { calendar in
-                            Toggle(
-                                isOn: Binding(
-                                    get: { calendarManager.getCalendarSelected(calendar) },
-                                    set: { isSelected in
-                                        Task {
-                                            await calendarManager.setCalendarSelected(
-                                                calendar, isSelected: isSelected)
-                                        }
+                    ForEach(calendarManager.eventCalendars, id: \.id) { calendar in
+                        Toggle(
+                            isOn: Binding(
+                                get: { calendarManager.getCalendarSelected(calendar) },
+                                set: { isSelected in
+                                    Task {
+                                        await calendarManager.setCalendarSelected(
+                                            calendar, isSelected: isSelected)
                                     }
-                                )
-                            ) {
-                                Text(calendar.title)
-                            }
-                            .accentColor(lighterColor(from: calendar.color))
-                            .disabled(!showCalendar)
+                                }
+                            )
+                        ) {
+                            Text(calendar.title)
                         }
+                        .tint(lighterColor(from: calendar.color))
                     }
                 }
             }
@@ -1111,24 +1051,21 @@ struct CalendarSettings: View {
                         }
                     }
                 } else {
-                    List {
-                        ForEach(calendarManager.reminderLists, id: \.id) { calendar in
-                            Toggle(
-                                isOn: Binding(
-                                    get: { calendarManager.getCalendarSelected(calendar) },
-                                    set: { isSelected in
-                                        Task {
-                                            await calendarManager.setCalendarSelected(
-                                                calendar, isSelected: isSelected)
-                                        }
+                    ForEach(calendarManager.reminderLists, id: \.id) { calendar in
+                        Toggle(
+                            isOn: Binding(
+                                get: { calendarManager.getCalendarSelected(calendar) },
+                                set: { isSelected in
+                                    Task {
+                                        await calendarManager.setCalendarSelected(
+                                            calendar, isSelected: isSelected)
                                     }
-                                )
-                            ) {
-                                Text(calendar.title)
-                            }
-                            .accentColor(lighterColor(from: calendar.color))
-                            .disabled(!showCalendar)
+                                }
+                            )
+                        ) {
+                            Text(calendar.title)
                         }
+                        .tint(lighterColor(from: calendar.color))
                     }
                 }
             }
@@ -1164,99 +1101,53 @@ func lighterColor(from nsColor: NSColor, amount: CGFloat = 0.14) -> Color {
 struct About: View {
     @State private var showBuildNumber: Bool = false
     let updaterController: SPUStandardUpdaterController
-    @Environment(\.openWindow) var openWindow
     var body: some View {
-        VStack {
-            HStack(spacing: 14) {
-                Image("NotchloomIcon")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 72, height: 72)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("Notchloom")
-                        .font(.system(size: 25, weight: .bold, design: .rounded))
-                    Text("Your notch, woven in")
-                        .font(.subheadline)
+        Form {
+            Section {
+                HStack {
+                    Text("Release name")
+                    Spacer()
+                    Text(Defaults[.releaseName])
                         .foregroundStyle(.secondary)
                 }
-                Spacer()
-            }
-            .padding(16)
-            .background(NotchloomTheme.ink, in: RoundedRectangle(cornerRadius: 18))
-            .overlay {
-                RoundedRectangle(cornerRadius: 18)
-                    .strokeBorder(NotchloomTheme.gradient, lineWidth: 1)
-                    .opacity(0.8)
-            }
-            .padding([.horizontal, .top], 20)
-            Form {
-                Section {
-                    HStack {
-                        Text("Release name")
-                        Spacer()
-                        Text(Defaults[.releaseName])
+                HStack {
+                    Text("Version")
+                    Spacer()
+                    Text(Bundle.main.releaseVersionNumber ?? "unknown")
+                        .foregroundStyle(.secondary)
+                    if showBuildNumber {
+                        Text("(\(Bundle.main.buildVersionNumber ?? ""))")
                             .foregroundStyle(.secondary)
                     }
-                    HStack {
-                        Text("Version")
-                        Spacer()
-                        if showBuildNumber {
-                            Text("(\(Bundle.main.buildVersionNumber ?? ""))")
-                                .foregroundStyle(.secondary)
-                        }
-                        Text(Bundle.main.releaseVersionNumber ?? "unknown")
-                            .foregroundStyle(.secondary)
-                    }
-                    .onTapGesture {
-                        withAnimation {
-                            showBuildNumber.toggle()
-                        }
-                    }
-                } header: {
-                    Text("Version info")
                 }
-
-                UpdaterSettingsView(updater: updaterController.updater)
-
-                HStack(spacing: 30) {
-                    Spacer(minLength: 0)
-                    Button {
-                        if let url = URL(string: "https://github.com/andomatthew1234/notchloom") {
-                            NSWorkspace.shared.open(url)
-                        }
-                    } label: {
-                        VStack(spacing: 5) {
-                            Image("Github")
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 18)
-                            Text("GitHub")
-                        }
-                        .contentShape(Rectangle())
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    withAnimation {
+                        showBuildNumber.toggle()
                     }
-                    Spacer(minLength: 0)
                 }
-                .buttonStyle(PlainButtonStyle())
+            } header: {
+                Text("Version")
             }
-            VStack(spacing: 0) {
-                Divider()
-                Text("Notchloom is based on Boring Notch by TheBoredTeam")
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 5)
-                    .padding(.bottom, 7)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 10)
+
+            UpdaterSettingsView(updater: updaterController.updater)
+
+            Section {
+                CheckForUpdatesView(updater: updaterController.updater)
+                Button {
+                    if let url = URL(string: "https://github.com/andomatthew1234/notchloom") {
+                        NSWorkspace.shared.open(url)
+                    }
+                } label: {
+                    Label("View Notchloom on GitHub", systemImage: "arrow.up.right.square")
+                }
+            } header: {
+                Text("More")
+            } footer: {
+                Text("Notchloom is based on Boring Notch by TheBoredTeam.")
             }
-            .frame(maxWidth: .infinity, alignment: .center)
         }
-        .toolbar {
-            //            Button("Welcome window") {
-            //                openWindow(id: "onboarding")
-            //            }
-            //            .controlSize(.extraLarge)
-            CheckForUpdatesView(updater: updaterController.updater)
-        }
+        .tint(NotchloomTheme.cyan)
     }
 }
 
@@ -1267,10 +1158,6 @@ struct Shelf: View {
     @Default(.expandedDragDetection) var expandedDragDetection: Bool
     @StateObject private var quickShareService = QuickShareService.shared
 
-    private var selectedProvider: QuickShareProvider? {
-        quickShareService.availableProviders.first(where: { $0.id == quickShareProvider })
-    }
-    
     init() {
         Task { await QuickShareService.shared.discoverAvailableProviders() }
     }
@@ -1313,7 +1200,7 @@ struct Shelf: View {
             }
             
             Section {
-                Picker("Quick Share Service", selection: $quickShareProvider) {
+                Picker("Quick Share service", selection: $quickShareProvider) {
                     ForEach(quickShareService.availableProviders, id: \.id) { provider in
                         HStack {
                             Group {
@@ -1334,36 +1221,8 @@ struct Shelf: View {
                 }
                 .pickerStyle(.menu)
                 
-                if let selectedProvider = selectedProvider {
-                    HStack {
-                        Group {
-                            if let imgData = selectedProvider.imageData, let nsImg = NSImage(data: imgData) {
-                                Image(nsImage: nsImg)
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                            } else {
-                                Image(systemName: "square.and.arrow.up")
-                            }
-                        }
-                        .frame(width: 16, height: 16)
-                        .foregroundColor(.accentColor)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Currently selected: \(selectedProvider.id)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Text("Files dropped on the shelf will be shared via this service")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .padding(.vertical, 4)
-                }
-                // Providers are always enabled; user can pick default service above.
-                
             } header: {
-                HStack {
-                    Text("Quick Share")
-                }
+                Text("Quick Share")
             } footer: {
                 Text("Choose which service to use when sharing files from the shelf. Click the shelf button to select files, or drag files onto it to share immediately.")
                     .font(.caption)
