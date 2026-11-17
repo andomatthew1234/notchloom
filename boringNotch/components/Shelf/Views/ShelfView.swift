@@ -12,19 +12,32 @@ struct ShelfView: View {
     @EnvironmentObject var vm: BoringViewModel
     @StateObject var tvm = ShelfStateViewModel.shared
     @StateObject var selection = ShelfSelectionModel.shared
+    @ObservedObject private var converter = ConversionManager.shared
     @StateObject private var quickLookService = QuickLookService()
     private let spacing: CGFloat = 8
 
     var body: some View {
-        HStack(spacing: 12) {
-            FileShareView()
-                .aspectRatio(1, contentMode: .fit)
-                .environmentObject(vm)
-            panel
-                .onDrop(of: [.fileURL, .url, .utf8PlainText, .plainText, .data], isTargeted: $vm.dragDetectorTargeting) { providers in
-                    handleDrop(providers: providers)
+        Group {
+            if converter.stage == .idle {
+                HStack(spacing: 10) {
+                    FileShareView()
+                        .frame(width: 138, height: 150)
+                        .environmentObject(vm)
+                    ConvertTargetView()
+                        .frame(width: 138, height: 150)
+                        .environmentObject(vm)
+                    panel
+                        .onDrop(of: [.fileURL, .url, .utf8PlainText, .plainText, .data], isTargeted: $vm.dragDetectorTargeting) { providers in
+                            handleDrop(providers: providers)
+                        }
                 }
+                .padding(.horizontal, 16)
+            } else {
+                ConvertPanelView()
+                    .frame(height: 150)
+            }
         }
+        .animation(.spring(response: 0.36, dampingFraction: 0.85), value: converter.stage)
         // Bind Quick Look to shelf selection
         .onChange(of: selection.selectedIDs) {
             updateQuickLookSelection()

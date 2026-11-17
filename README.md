@@ -30,6 +30,7 @@ Notchloom is a macOS notch utility built from [Boring Notch](https://github.com/
 - **Focus time.** Start a 5, 15, 25, or 50 minute session, pause it, and see a quiet completion card. The timer survives app restarts.
 - **Quick apps.** Launch up to four favorite Mac apps from the notch and arrange them in Settings.
 - **Quick tools.** Overview has a Dashboard with Now Playing and quick apps, plus separate Calendar and Focus Timer tabs. Calendar shows an off message when disabled; the camera mirror and battery widget appear when enabled. The file shelf and Quick Share remain available when enabled.
+- **Convert in the Shelf.** Drop a file or folder on Convert to choose an available output, watch progress, and reveal or drag the result. Native macOS converters handle common images, media, documents, and folder-to-ZIP; optional FFmpeg expands media choices. [Supported conversions and limits](docs/conversion.md).
 - **Fits your display.** Adjust notch sizing, hover behavior, gestures, and which displays show Notchloom.
 - **Your own look.** The settings window uses the Notchloom logo and a dark cyan and violet theme.
 

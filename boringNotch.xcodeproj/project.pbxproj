@@ -95,6 +95,14 @@
 		A1B2C3D42E00000200000001 /* FocusTimerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D42E00000200000002 /* FocusTimerManager.swift */; };
 		A1B2C3D42E00000200000003 /* QuickAppsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D42E00000200000004 /* QuickAppsManager.swift */; };
 		A1B2C3D42E00000200000007 /* NotchToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D42E00000200000008 /* NotchToolsView.swift */; };
+		C0A1C0DE0000000000000001 /* ConversionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A1C0DE0000000000000011 /* ConversionModels.swift */; };
+		C0A1C0DE0000000000000002 /* ConversionEngines.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A1C0DE0000000000000012 /* ConversionEngines.swift */; };
+		C0A1C0DE0000000000000003 /* ConversionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A1C0DE0000000000000013 /* ConversionManager.swift */; };
+		C0A1C0DE0000000000000004 /* ConvertView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A1C0DE0000000000000014 /* ConvertView.swift */; };
+		C0A1C0DE0000000000000005 /* FFmpegConversionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A1C0DE0000000000000015 /* FFmpegConversionEngine.swift */; };
+		C0A1C0DE0000000000000006 /* TextUtilConversionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A1C0DE0000000000000016 /* TextUtilConversionEngine.swift */; };
+		C0A1C0DE0000000000000007 /* ConversionPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A1C0DE0000000000000017 /* ConversionPreferences.swift */; };
+		C0A1C0DE0000000000000008 /* ArchiveConversionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A1C0DE0000000000000018 /* ArchiveConversionEngine.swift */; };
 		14CEF41A2C5CAED400855D72 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 14CEF4192C5CAED400855D72 /* Assets.xcassets */; };
 		14CEF41D2C5CAED400855D72 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 14CEF41C2C5CAED400855D72 /* Preview Assets.xcassets */; };
 		14D0321A2C68F32E0096E6A1 /* LaunchAtLogin in Frameworks */ = {isa = PBXBuildFile; productRef = 14D032192C68F32E0096E6A1 /* LaunchAtLogin */; };
@@ -269,6 +277,14 @@
 		A1B2C3D42E00000200000002 /* FocusTimerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusTimerManager.swift; sourceTree = "<group>"; };
 		A1B2C3D42E00000200000004 /* QuickAppsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickAppsManager.swift; sourceTree = "<group>"; };
 		A1B2C3D42E00000200000008 /* NotchToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchToolsView.swift; sourceTree = "<group>"; };
+		C0A1C0DE0000000000000011 /* ConversionModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversionModels.swift; sourceTree = "<group>"; };
+		C0A1C0DE0000000000000012 /* ConversionEngines.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversionEngines.swift; sourceTree = "<group>"; };
+		C0A1C0DE0000000000000013 /* ConversionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversionManager.swift; sourceTree = "<group>"; };
+		C0A1C0DE0000000000000014 /* ConvertView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvertView.swift; sourceTree = "<group>"; };
+		C0A1C0DE0000000000000015 /* FFmpegConversionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFmpegConversionEngine.swift; sourceTree = "<group>"; };
+		C0A1C0DE0000000000000016 /* TextUtilConversionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextUtilConversionEngine.swift; sourceTree = "<group>"; };
+		C0A1C0DE0000000000000017 /* ConversionPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversionPreferences.swift; sourceTree = "<group>"; };
+		C0A1C0DE0000000000000018 /* ArchiveConversionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveConversionEngine.swift; sourceTree = "<group>"; };
 		14CEF4192C5CAED400855D72 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		14CEF41C2C5CAED400855D72 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		14CEF41E2C5CAED400855D72 /* boringNotch.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = boringNotch.entitlements; sourceTree = "<group>"; };
@@ -411,6 +427,21 @@
 				9A987A032C73CA66005CA465 /* ShelfView.swift */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		C0A1C0DE0000000000000020 /* Convert */ = {
+			isa = PBXGroup;
+			children = (
+				C0A1C0DE0000000000000011 /* ConversionModels.swift */,
+				C0A1C0DE0000000000000012 /* ConversionEngines.swift */,
+				C0A1C0DE0000000000000013 /* ConversionManager.swift */,
+				C0A1C0DE0000000000000014 /* ConvertView.swift */,
+				C0A1C0DE0000000000000015 /* FFmpegConversionEngine.swift */,
+				C0A1C0DE0000000000000016 /* TextUtilConversionEngine.swift */,
+				C0A1C0DE0000000000000017 /* ConversionPreferences.swift */,
+				C0A1C0DE0000000000000018 /* ArchiveConversionEngine.swift */,
+			);
+			path = Convert;
 			sourceTree = "<group>";
 		};
 		112B0EB62E30DD0F00562D6C /* mediaremote-adapter */ = {
@@ -664,6 +695,7 @@
 		9A987A042C73CA66005CA465 /* Shelf */ = {
 			isa = PBXGroup;
 			children = (
+				C0A1C0DE0000000000000020 /* Convert */,
 				1113ABB82E80E27000EC13B2 /* Models */,
 				1113ABBF2E80E27000EC13B2 /* Services */,
 				1113ABC22E80E27000EC13B2 /* ViewModels */,
@@ -1007,6 +1039,14 @@
 				A1B2C3D42E00000200000003 /* QuickAppsManager.swift in Sources */,
 				A1B2C3D42E00000200000007 /* NotchToolsView.swift in Sources */,
 				9A987A0D2C73CA66005CA465 /* ShelfView.swift in Sources */,
+				C0A1C0DE0000000000000001 /* ConversionModels.swift in Sources */,
+				C0A1C0DE0000000000000002 /* ConversionEngines.swift in Sources */,
+				C0A1C0DE0000000000000003 /* ConversionManager.swift in Sources */,
+				C0A1C0DE0000000000000004 /* ConvertView.swift in Sources */,
+				C0A1C0DE0000000000000005 /* FFmpegConversionEngine.swift in Sources */,
+				C0A1C0DE0000000000000006 /* TextUtilConversionEngine.swift in Sources */,
+				C0A1C0DE0000000000000007 /* ConversionPreferences.swift in Sources */,
+				C0A1C0DE0000000000000008 /* ArchiveConversionEngine.swift in Sources */,
 				1132E5142E777B920068732D /* YouTubeMusicNetworking.swift in Sources */,
 				1132E5122E777B6E0068732D /* YouTubeMusicModels.swift in Sources */,
 				11CFC65F2E097F2F00748C80 /* OnboardingView.swift in Sources */,
@@ -1062,14 +1102,14 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 293;
+				CURRENT_PROJECT_VERSION = 300;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = BoringNotchXPCHelper/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = BoringNotchXPCHelper;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.7.25;
+				MARKETING_VERSION = 2.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = theboringteam.boringnotch.BoringNotchXPCHelper;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -1087,14 +1127,14 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 293;
+				CURRENT_PROJECT_VERSION = 300;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = BoringNotchXPCHelper/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = BoringNotchXPCHelper;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.7.25;
+				MARKETING_VERSION = 2.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = theboringteam.boringnotch.BoringNotchXPCHelper;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -1241,7 +1281,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 293;
+				CURRENT_PROJECT_VERSION = 300;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"boringNotch/Preview Content\"";
 				DEVELOPMENT_TEAM = "";
@@ -1269,7 +1309,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.7.25;
+				MARKETING_VERSION = 2.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = theboringteam.boringnotch;
 				PRODUCT_NAME = Notchloom;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1296,7 +1336,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 293;
+				CURRENT_PROJECT_VERSION = 300;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"boringNotch/Preview Content\"";
 				DEVELOPMENT_TEAM = "";
@@ -1323,7 +1363,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.7.25;
+				MARKETING_VERSION = 2.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = theboringteam.boringnotch;
 				PRODUCT_NAME = Notchloom;
 				PROVISIONING_PROFILE_SPECIFIER = "";
