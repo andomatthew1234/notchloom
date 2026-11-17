@@ -145,6 +145,19 @@ final class XPCHelperClient: NSObject {
             return false
         }
     }
+
+    nonisolated func visibleNotificationBanners() async -> Data? {
+        do {
+            let service = await MainActor.run { ensureRemoteService() }
+            return try await service.withContinuation { service, continuation in
+                service.visibleNotificationBanners { data in
+                    continuation.resume(returning: data)
+                }
+            }
+        } catch {
+            return nil
+        }
+    }
     
     // MARK: - Keyboard Brightness
     

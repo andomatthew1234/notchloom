@@ -23,6 +23,7 @@ struct ContentView: View {
     @ObservedObject var batteryModel = BatteryStatusViewModel.shared
     @ObservedObject var brightnessManager = BrightnessManager.shared
     @ObservedObject var volumeManager = VolumeManager.shared
+    @ObservedObject private var notificationMirror = NotificationMirror.shared
     @State private var hoverTask: Task<Void, Never>?
     @State private var isHovering: Bool = false
     @State private var anyDropDebounceTask: Task<Void, Never>?
@@ -65,6 +66,8 @@ struct ContentView: View {
             && vm.notchState == .closed && Defaults[.showPowerStatusNotifications]
         {
             chinWidth = 640
+        } else if notificationMirror.current != nil && vm.notchState == .closed {
+            chinWidth = 480
         } else if (!coordinator.expandingView.show || coordinator.expandingView.type == .music)
             && vm.notchState == .closed && (musicManager.isPlaying || !musicManager.isPlayerIdle)
             && coordinator.musicLiveActivityEnabled && !vm.hideOnClosed
@@ -100,7 +103,8 @@ struct ContentView: View {
                         : cornerRadiusInsets.closed.bottom
                     )
                     .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
-                    .background(.black)
+                    .background(notificationMirror.current != nil && vm.notchState == .closed
+                        ? Color.clear : Color.black)
                     .clipShape(currentNotchShape)
                     .overlay(alignment: .top) {
                         Rectangle()
@@ -287,6 +291,16 @@ struct ContentView: View {
                       } else if coordinator.sneakPeek.show && Defaults[.inlineHUD] && (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && vm.notchState == .closed {
                           InlineHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon, hoverAnimation: $isHovering, gestureProgress: $gestureProgress)
                               .transition(.opacity)
+                      } else if let notification = notificationMirror.current, vm.notchState == .closed {
+                          NotchNotificationCard(
+                              notification: notification,
+                              stemHeight: vm.effectiveClosedNotchHeight,
+                              stemWidth: vm.closedNotchSize.width
+                          )
+                          .transition(.asymmetric(
+                              insertion: .scale(scale: 0.88, anchor: .top).combined(with: .opacity),
+                              removal: .scale(scale: 0.96, anchor: .top).combined(with: .opacity)
+                          ))
                       } else if (!coordinator.expandingView.show || coordinator.expandingView.type == .music) && vm.notchState == .closed && (musicManager.isPlaying || !musicManager.isPlayerIdle) && coordinator.musicLiveActivityEnabled && !vm.hideOnClosed {
                           MusicLiveActivity()
                               .frame(alignment: .center)
@@ -337,7 +351,7 @@ struct ContentView: View {
                       }
                   }
               }
-              .conditionalModifier((coordinator.sneakPeek.show && (coordinator.sneakPeek.type == .music) && vm.notchState == .closed && !vm.hideOnClosed && Defaults[.sneakPeekStyles] == .standard) || (coordinator.sneakPeek.show && (coordinator.sneakPeek.type != .music) && (vm.notchState == .closed))) { view in
+              .conditionalModifier((coordinator.sneakPeek.show && (coordinator.sneakPeek.type == .music) && vm.notchState == .closed && !vm.hideOnClosed && Defaults[.sneakPeekStyles] == .standard) || (coordinator.sneakPeek.show && (coordinator.sneakPeek.type != .music) && (vm.notchState == .closed)) || (notificationMirror.current != nil && vm.notchState == .closed)) { view in
                   view
                       .fixedSize()
               }

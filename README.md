@@ -25,6 +25,7 @@ Notchloom is a macOS notch utility built from [Boring Notch](https://github.com/
 
 - **Music at a glance.** See artwork and playback status, use configurable controls, and show lyrics when available.
 - **A custom system HUD.** Show volume, brightness, and keyboard backlight changes in the notch, including a compact inline view when closed.
+- **Notifications from the notch.** Mirror visible macOS app banners in a brief, rounded notch card. The original banner stays available for its actions.
 - **Quick tools.** Open a camera mirror, view calendar events and reminders, or use the file shelf and Quick Share when you enable them.
 - **Fits your display.** Adjust notch sizing, hover behavior, gestures, and which displays show Notchloom.
 - **Your own look.** The settings window uses the Notchloom logo and a dark cyan and violet theme.
@@ -46,8 +47,9 @@ You can [build Notchloom from source](#build-from-source). A public installer is
 | Music | Show lyrics and live activity; use Shuffle, Previous, Play/Pause, Next, and Favorite controls |
 | Appearance | Enable the camera mirror and album-art slider colors; leave Calendar and the file shelf off |
 | HUD | Replace the system HUD after Accessibility is granted; use the inline style with glow, accent tint, and percentages |
+| Notifications | Mirror visible app banners from the notch when Accessibility is available |
 
-Existing preferences stay in place when upgrading. Permissions, completed onboarding, and device-specific display IDs are never copied from the maintainer's Mac. Camera access is needed for the mirror; Accessibility access is needed for HUD replacement and media-key interception.
+Existing preferences stay in place when upgrading. Permissions, completed onboarding, and device-specific display IDs are never copied from the maintainer's Mac. Camera access is needed for the mirror; Accessibility access is needed for HUD replacement, media-key interception, and visible notification banners. Notchloom does not read notification history or bypass hidden previews.
 
 ## Build from source
 

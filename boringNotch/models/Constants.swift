@@ -151,6 +151,7 @@ extension Defaults.Keys {
     static let selectedDownloadIconStyle = Key<DownloadIconStyle>("selectedDownloadIconStyle", default: DownloadIconStyle.onlyAppIcon)
     
     // MARK: HUD
+    static let showNotificationBanners = Key<Bool>("showNotificationBanners", default: true)
     static let hudReplacement = Key<Bool>("hudReplacement", default: true)
     static let inlineHUD = Key<Bool>("inlineHUD", default: true)
     static let enableGradient = Key<Bool>("enableGradient", default: false)

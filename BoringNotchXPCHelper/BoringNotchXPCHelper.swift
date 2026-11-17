@@ -11,6 +11,10 @@ import IOKit
 import CoreGraphics
 
 class BoringNotchXPCHelper: NSObject, BoringNotchXPCHelperProtocol {
+
+    @objc func visibleNotificationBanners(with reply: @escaping (Data) -> Void) {
+        reply(NotificationBannerReader.visibleBanners())
+    }
     
     @objc func isAccessibilityAuthorized(with reply: @escaping (Bool) -> Void) {
         reply(AXIsProcessTrusted())

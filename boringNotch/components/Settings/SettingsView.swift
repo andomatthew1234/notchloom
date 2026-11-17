@@ -82,6 +82,7 @@ struct SettingsView: View {
         case "General": return ("General", "Choose where Notchloom appears and how it opens.", "gearshape")
         case "Appearance": return ("Appearance", "Adjust the look of the notch and music player.", "paintbrush.pointed")
         case "Media": return ("Media", "Pick your music source, controls, and playback behavior.", "music.note")
+        case "Notifications": return ("Notifications", "See new app banners emerge from the notch.", "bell.badge")
         case "Calendar": return ("Calendar", "Choose which events and reminders appear in the notch.", "calendar")
         case "HUD": return ("System HUD", "Show volume and brightness changes around the notch.", "slider.horizontal.3")
         case "Battery": return ("Battery", "Control charging alerts and battery details.", "battery.100.bolt")
@@ -124,6 +125,9 @@ struct SettingsView: View {
                     }
                 }
                 Section("TOOLS") {
+                    NavigationLink(value: "Notifications") {
+                        Label("Notifications", systemImage: "bell.badge")
+                    }
                     NavigationLink(value: "HUD") {
                         Label("System HUD", systemImage: "slider.horizontal.3")
                     }
@@ -177,6 +181,8 @@ struct SettingsView: View {
                     Appearance()
                 case "Media":
                     Media()
+                case "Notifications":
+                    NotificationsSettings()
                 case "Calendar":
                     CalendarSettings()
                 case "HUD":
@@ -804,6 +810,53 @@ struct Media: View {
             return MediaControllerType.allCases.filter { $0 != .nowPlaying }
         } else {
             return MediaControllerType.allCases
+        }
+    }
+}
+
+struct NotificationsSettings: View {
+    @Default(.showNotificationBanners) private var showNotificationBanners
+    @State private var accessibilityGranted = false
+
+    var body: some View {
+        Form {
+            Section {
+                Defaults.Toggle(key: .showNotificationBanners) {
+                    Text("Show app notifications from the notch")
+                }
+            } header: {
+                Text("Notification banners")
+            } footer: {
+                Text("Notchloom mirrors banners that macOS shows on screen. Original banners and their actions stay available; hidden notifications are never opened.")
+            }
+
+            if showNotificationBanners {
+                Section {
+                    Button("Preview in the notch") {
+                        NotificationMirror.shared.preview()
+                    }
+                    if !accessibilityGranted {
+                        Button("Request Accessibility access") {
+                            XPCHelperClient.shared.requestAccessibilityAuthorization()
+                        }
+                        Text("Accessibility access lets Notchloom see visible notification banners. Notification content stays on this Mac.")
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Try it")
+                } footer: {
+                    Text("Notifications appear briefly, then the notch returns to what you were doing.")
+                }
+            }
+        }
+        .tint(NotchloomTheme.cyan)
+        .task {
+            accessibilityGranted = await XPCHelperClient.shared.isAccessibilityAuthorized()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .accessibilityAuthorizationChanged)) { notification in
+            if let granted = notification.userInfo?["granted"] as? Bool {
+                accessibilityGranted = granted
+            }
         }
     }
 }

@@ -92,6 +92,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             screenUnlockedObserver = nil
         }
         MusicManager.shared.destroy()
+        NotificationMirror.shared.stop()
         cleanupDragDetectors()
         cleanupWindows()
         XPCHelperClient.shared.stopMonitoringAccessibilityAuthorization()
@@ -289,6 +290,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NotificationMirror.shared.start()
         // Apply the login preference only on a fresh installation. Existing users keep
         // their own login-item choice, and the marker prevents later re-registration.
         let userDefaults = UserDefaults.standard
