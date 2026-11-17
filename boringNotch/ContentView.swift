@@ -59,6 +59,16 @@ struct ContentView: View {
         )
     }
 
+    private var notificationScreen: NSScreen? {
+        vm.screenUUID.flatMap { NSScreen.screen(withUUID: $0) } ?? NSScreen.main
+    }
+    private var notificationScreenID: String { vm.screenUUID ?? "main" }
+    private var notificationBlocked: Bool {
+        vm.notchState == .open || vm.hideOnClosed || coordinator.helloAnimationRunning
+            || (coordinator.sneakPeek.show && coordinator.sneakPeek.type != .music)
+            || (coordinator.expandingView.show && coordinator.expandingView.type == .battery)
+    }
+
     private var computedChinWidth: CGFloat {
         var chinWidth: CGFloat = vm.closedNotchSize.width
 
@@ -66,8 +76,6 @@ struct ContentView: View {
             && vm.notchState == .closed && Defaults[.showPowerStatusNotifications]
         {
             chinWidth = 640
-        } else if notificationMirror.current != nil && vm.notchState == .closed {
-            chinWidth = 480
         } else if (!coordinator.expandingView.show || coordinator.expandingView.type == .music)
             && vm.notchState == .closed && (musicManager.isPlaying || !musicManager.isPlayerIdle)
             && coordinator.musicLiveActivityEnabled && !vm.hideOnClosed
@@ -103,19 +111,18 @@ struct ContentView: View {
                         : cornerRadiusInsets.closed.bottom
                     )
                     .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
-                    .background(notificationMirror.current != nil && vm.notchState == .closed
-                        ? Color.clear : Color.black)
-                    .clipShape(currentNotchShape)
-                    .overlay(alignment: .top) {
-                        Rectangle()
-                            .fill(.black)
-                            .frame(height: 1)
-                            .padding(.horizontal, topCornerRadius)
+                    .conditionalModifier(vm.notchState == .closed) { view in
+                        view.fixedSize()
                     }
-                    .shadow(
-                        color: ((vm.notchState == .open || isHovering) && Defaults[.enableShadow])
-                            ? .black.opacity(0.7) : .clear, radius: Defaults[.cornerRadiusScaling] ? 6 : 4
-                    )
+                    .modifier(NotificationNotchSurface(
+                        presentation: notificationMirror,
+                        screenID: notificationScreenID,
+                        screenFrame: notificationScreen?.frame ?? CGRect(x: 0, y: 0, width: 1440, height: 900),
+                        topInset: notificationScreen?.safeAreaInsets.top ?? 0,
+                        blocked: notificationBlocked,
+                        normalShape: currentNotchShape,
+                        normalShadow: (vm.notchState == .open || isHovering) && Defaults[.enableShadow]
+                    ))
                     .padding(
                         .bottom,
                         vm.effectiveClosedNotchHeight == 0 ? 10 : 0
@@ -136,7 +143,7 @@ struct ContentView: View {
                         handleHover(hovering)
                     }
                     .onTapGesture {
-                        doOpen()
+                        if notificationMirror.current == nil { doOpen() }
                     }
                     .conditionalModifier(Defaults[.enableGestures]) { view in
                         view
@@ -218,6 +225,11 @@ struct ContentView: View {
         .background(dragDetector)
         .preferredColorScheme(.dark)
         .environmentObject(vm)
+        .onChange(of: notificationMirror.current?.id) { _, id in
+            hoverTask?.cancel()
+            notificationMirror.setHovered(id != nil && isHovering, on: notificationScreenID)
+            isHovering = false
+        }
         .onChange(of: vm.anyDropZoneTargeting) { _, isTargeted in
             anyDropDebounceTask?.cancel()
 
@@ -291,16 +303,6 @@ struct ContentView: View {
                       } else if coordinator.sneakPeek.show && Defaults[.inlineHUD] && (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && vm.notchState == .closed {
                           InlineHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon, hoverAnimation: $isHovering, gestureProgress: $gestureProgress)
                               .transition(.opacity)
-                      } else if let notification = notificationMirror.current, vm.notchState == .closed {
-                          NotchNotificationCard(
-                              notification: notification,
-                              stemHeight: vm.effectiveClosedNotchHeight,
-                              stemWidth: vm.closedNotchSize.width
-                          )
-                          .transition(.asymmetric(
-                              insertion: .scale(scale: 0.88, anchor: .top).combined(with: .opacity),
-                              removal: .scale(scale: 0.96, anchor: .top).combined(with: .opacity)
-                          ))
                       } else if (!coordinator.expandingView.show || coordinator.expandingView.type == .music) && vm.notchState == .closed && (musicManager.isPlaying || !musicManager.isPlayerIdle) && coordinator.musicLiveActivityEnabled && !vm.hideOnClosed {
                           MusicLiveActivity()
                               .frame(alignment: .center)
@@ -351,7 +353,7 @@ struct ContentView: View {
                       }
                   }
               }
-              .conditionalModifier((coordinator.sneakPeek.show && (coordinator.sneakPeek.type == .music) && vm.notchState == .closed && !vm.hideOnClosed && Defaults[.sneakPeekStyles] == .standard) || (coordinator.sneakPeek.show && (coordinator.sneakPeek.type != .music) && (vm.notchState == .closed)) || (notificationMirror.current != nil && vm.notchState == .closed)) { view in
+              .conditionalModifier((coordinator.sneakPeek.show && (coordinator.sneakPeek.type == .music) && vm.notchState == .closed && !vm.hideOnClosed && Defaults[.sneakPeekStyles] == .standard) || (coordinator.sneakPeek.show && (coordinator.sneakPeek.type != .music) && (vm.notchState == .closed))) { view in
                   view
                       .fixedSize()
               }
@@ -527,6 +529,11 @@ struct ContentView: View {
     // MARK: - Hover Management
 
     private func handleHover(_ hovering: Bool) {
+        if notificationMirror.current != nil {
+            hoverTask?.cancel()
+            notificationMirror.setHovered(hovering, on: notificationScreenID)
+            return
+        }
         if coordinator.firstLaunch { return }
         hoverTask?.cancel()
         
@@ -576,6 +583,7 @@ struct ContentView: View {
     // MARK: - Gesture Handling
 
     private func handleDownGesture(translation: CGFloat, phase: NSEvent.Phase) {
+        guard notificationMirror.current == nil else { return }
         guard vm.notchState == .closed else { return }
 
         if phase == .ended {

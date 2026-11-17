@@ -1,0 +1,10 @@
+#!/bin/zsh
+set -euo pipefail
+cd "$(dirname "$0")/.."
+check_dir=$(mktemp -d /tmp/notchloom-checks.XXXXXX)
+trap 'rm -rf "$check_dir"' EXIT
+sources=(boringNotch/NotificationPresentation.swift boringNotch/components/Notch/NotchShape.swift)
+swiftc -parse-as-library "${sources[@]}" tests/NotificationPresentationTests.swift -o "$check_dir/checks"
+"$check_dir/checks"
+swiftc -parse-as-library "${sources[@]}" tests/RenderNotificationSamples.swift -o "$check_dir/render"
+"$check_dir/render" "$PWD/dist/notification-redesign"

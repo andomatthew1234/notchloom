@@ -25,7 +25,7 @@ Notchloom is a macOS notch utility built from [Boring Notch](https://github.com/
 
 - **Music at a glance.** See artwork and playback status, use configurable controls, and show lyrics when available.
 - **A custom system HUD.** Show volume, brightness, and keyboard backlight changes in the notch, including a compact inline view when closed.
-- **Notifications from the notch.** Mirror visible macOS app banners in a refined notch card. Clock alarms and finished timers receive a longer, warm-accented presentation. The original banner stays available for its actions.
+- **Notifications from the notch.** The notch itself expands into one continuous black surface for visible macOS banners. Compact text, staged spring motion, hover pausing, and a queue keep alerts readable. Clock alerts stay visible longer; original macOS actions remain available.
 - **Focus time.** Start a 5, 15, 25, or 50 minute session, pause it, and see a quiet completion card. The timer survives app restarts.
 - **Quick apps.** Launch up to four favorite Mac apps from the notch and arrange them in Settings.
 - **Sound output.** See the current speaker or headphones and switch outputs from the notch.
@@ -82,3 +82,5 @@ The script uses a pinned `dmgbuild` version and writes `dist/Notchloom-<version>
 The [Notchloom appcast](appcast.xml) is empty until the first public binary release. Update checks point to this fork, so Notchloom will not install an upstream Boring Notch build.
 
 Notchloom is based on [Boring Notch by TheBoredTeam](https://github.com/TheBoredTeam/boring.notch). The original README is preserved in [docs/UPSTREAM_README.md](docs/UPSTREAM_README.md). This fork keeps the project's [GNU GPLv3 license](LICENSE). The Notchloom icon was generated for this fork and prepared as a macOS app icon.
+
+Notification presentation and verification are described in [the design notes](docs/notification-design.md).
