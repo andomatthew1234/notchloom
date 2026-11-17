@@ -27,7 +27,7 @@ struct TabSelectionView: View {
     @Namespace private var selectionAnimation
 
     var body: some View {
-        HStack(spacing: 7) {
+        HStack(spacing: 8) {
             ForEach(tabs) { tab in
                 if tab.view != .shelf || shelfEnabled {
                     Button {
@@ -35,7 +35,7 @@ struct TabSelectionView: View {
                             coordinator.currentView = tab.view
                         }
                     } label: {
-                        VStack(spacing: 1) {
+                        HStack(spacing: 5) {
                             Image(systemName: tab.icon)
                                 .font(.system(size: 11, weight: .semibold))
                             Text(tab.label)
@@ -43,7 +43,7 @@ struct TabSelectionView: View {
                         }
                         .foregroundStyle(coordinator.currentView == tab.view ? .white : .white.opacity(0.68))
                         .padding(.horizontal, 7)
-                        .frame(height: 29)
+                        .frame(height: 28)
                         .lineLimit(1)
                         .contentShape(Capsule())
                     }
@@ -59,15 +59,13 @@ struct TabSelectionView: View {
                 }
             }
         }
-        .padding(2)
-        .background(.white.opacity(0.07), in: Capsule())
         .fixedSize(horizontal: true, vertical: false)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Notch view")
         .onChange(of: shelfEnabled) { _, enabled in
             if !enabled && coordinator.currentView == .shelf {
                 withAnimation(.snappy(duration: 0.28, extraBounce: 0)) {
-                    coordinator.currentView = .home
+                    coordinator.currentView = .tools
                 }
             }
         }

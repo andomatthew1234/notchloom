@@ -1392,7 +1392,7 @@ struct Appearance: View {
             Section {
                 Toggle("Always show tabs in the open notch", isOn: $coordinator.alwaysShowTabs)
                 Defaults.Toggle(key: .settingsIconInNotch) {
-                    Text("Show the Settings button at the top left")
+                    Text("Show the Settings button at the top right")
                 }
 
             } header: {

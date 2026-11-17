@@ -34,21 +34,7 @@ struct BoringHeader: View {
 
         HStack(spacing: 0) {
             HStack(spacing: 0) {
-                if showSettings {
-                    Button {
-                        SettingsWindowController.shared.showWindow()
-                    } label: {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.8))
-                            .frame(width: 28, height: 28)
-                            .background(.white.opacity(0.09), in: Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .help("Notchloom Settings")
-                    .accessibilityLabel("Notchloom Settings")
-                }
-                Spacer(minLength: 6)
+                Spacer(minLength: 0)
                 if showsTabs {
                     TabSelectionView()
                 } else {
@@ -63,7 +49,7 @@ struct BoringHeader: View {
                     .help("Open Overview")
                 }
             }
-            .padding(.trailing, 6)
+            .padding(.trailing, 4)
             .frame(width: sideWidth, height: headerHeight)
 
             Rectangle()
@@ -71,13 +57,28 @@ struct BoringHeader: View {
                 .frame(width: vm.closedNotchSize.width, height: headerHeight)
                 .mask { NotchShape() }
 
-            utilityHUD
-                .frame(width: sideWidth, height: headerHeight, alignment: .trailing)
+            HStack(spacing: 6) {
+                utilityHUD
+                Spacer(minLength: 0)
+                if showSettings {
+                    Button {
+                        SettingsWindowController.shared.showWindow()
+                    } label: {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.82))
+                            .frame(width: 29, height: 29)
+                            .background(.white.opacity(0.1), in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Notchloom Settings")
+                    .accessibilityLabel("Notchloom Settings")
+                }
+            }
+            .padding(.trailing, 4)
+            .frame(width: sideWidth, height: headerHeight)
         }
         .frame(width: contentWidth, height: headerHeight)
-        // NotchLayout is leading-aligned to the wider player content. Bring the
-        // camera spacer back to the screen center while keeping tabs beside it.
-        .offset(x: -vm.closedNotchSize.width / 2)
         .foregroundColor(.gray)
         .environmentObject(vm)
     }

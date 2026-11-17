@@ -94,7 +94,6 @@
 		A1B2C3D42E00000100000001 /* NotificationMirror.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D42E00000100000002 /* NotificationMirror.swift */; };
 		A1B2C3D42E00000200000001 /* FocusTimerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D42E00000200000002 /* FocusTimerManager.swift */; };
 		A1B2C3D42E00000200000003 /* QuickAppsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D42E00000200000004 /* QuickAppsManager.swift */; };
-		A1B2C3D42E00000200000005 /* AudioOutputManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D42E00000200000006 /* AudioOutputManager.swift */; };
 		A1B2C3D42E00000200000007 /* NotchToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D42E00000200000008 /* NotchToolsView.swift */; };
 		14CEF41A2C5CAED400855D72 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 14CEF4192C5CAED400855D72 /* Assets.xcassets */; };
 		14CEF41D2C5CAED400855D72 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 14CEF41C2C5CAED400855D72 /* Preview Assets.xcassets */; };
@@ -269,7 +268,6 @@
 		A1B2C3D42E00000100000002 /* NotificationMirror.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationMirror.swift; sourceTree = "<group>"; };
 		A1B2C3D42E00000200000002 /* FocusTimerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusTimerManager.swift; sourceTree = "<group>"; };
 		A1B2C3D42E00000200000004 /* QuickAppsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickAppsManager.swift; sourceTree = "<group>"; };
-		A1B2C3D42E00000200000006 /* AudioOutputManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioOutputManager.swift; sourceTree = "<group>"; };
 		A1B2C3D42E00000200000008 /* NotchToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchToolsView.swift; sourceTree = "<group>"; };
 		14CEF4192C5CAED400855D72 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		14CEF41C2C5CAED400855D72 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
@@ -592,7 +590,6 @@
                 A1B2C3D42E00000300000002 /* NotificationPresentation.swift */,
 				A1B2C3D42E00000200000002 /* FocusTimerManager.swift */,
 				A1B2C3D42E00000200000004 /* QuickAppsManager.swift */,
-				A1B2C3D42E00000200000006 /* AudioOutputManager.swift */,
 				B17266E02C6532560031BA0D /* Localizable.xcstrings */,
 				14CEF4192C5CAED400855D72 /* Assets.xcassets */,
 				14A7E5962C65FD31008C1BE9 /* boring.m4a */,
@@ -1008,7 +1005,6 @@
                 A1B2C3D42E00000300000001 /* NotificationPresentation.swift in Sources */,
 				A1B2C3D42E00000200000001 /* FocusTimerManager.swift in Sources */,
 				A1B2C3D42E00000200000003 /* QuickAppsManager.swift in Sources */,
-				A1B2C3D42E00000200000005 /* AudioOutputManager.swift in Sources */,
 				A1B2C3D42E00000200000007 /* NotchToolsView.swift in Sources */,
 				9A987A0D2C73CA66005CA465 /* ShelfView.swift in Sources */,
 				1132E5142E777B920068732D /* YouTubeMusicNetworking.swift in Sources */,
@@ -1066,14 +1062,14 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 289;
+				CURRENT_PROJECT_VERSION = 290;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = BoringNotchXPCHelper/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = BoringNotchXPCHelper;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.7.21;
+				MARKETING_VERSION = 2.7.22;
 				PRODUCT_BUNDLE_IDENTIFIER = theboringteam.boringnotch.BoringNotchXPCHelper;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -1091,14 +1087,14 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 289;
+				CURRENT_PROJECT_VERSION = 290;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = BoringNotchXPCHelper/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = BoringNotchXPCHelper;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.7.21;
+				MARKETING_VERSION = 2.7.22;
 				PRODUCT_BUNDLE_IDENTIFIER = theboringteam.boringnotch.BoringNotchXPCHelper;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -1245,7 +1241,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 289;
+				CURRENT_PROJECT_VERSION = 290;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"boringNotch/Preview Content\"";
 				DEVELOPMENT_TEAM = "";
@@ -1273,7 +1269,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.7.21;
+				MARKETING_VERSION = 2.7.22;
 				PRODUCT_BUNDLE_IDENTIFIER = theboringteam.boringnotch;
 				PRODUCT_NAME = Notchloom;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1300,7 +1296,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 289;
+				CURRENT_PROJECT_VERSION = 290;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"boringNotch/Preview Content\"";
 				DEVELOPMENT_TEAM = "";
@@ -1327,7 +1323,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.7.21;
+				MARKETING_VERSION = 2.7.22;
 				PRODUCT_BUNDLE_IDENTIFIER = theboringteam.boringnotch;
 				PRODUCT_NAME = Notchloom;
 				PROVISIONING_PROFILE_SPECIFIER = "";

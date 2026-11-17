@@ -1,36 +1,40 @@
 import Defaults
 import SwiftUI
 
-/// Overview contains the non-music tools on the same continuous notch surface.
+/// Overview keeps its tools inside the open notch, with a stable bottom tab bar.
 struct NotchToolsView: View {
     @EnvironmentObject private var vm: BoringViewModel
     @ObservedObject private var focus = FocusTimerManager.shared
     @ObservedObject private var apps = QuickAppsManager.shared
-    @ObservedObject private var audio = AudioOutputManager.shared
+    @ObservedObject private var music = MusicManager.shared
     @ObservedObject private var webcam = WebcamManager.shared
     @ObservedObject private var battery = BatteryStatusViewModel.shared
     @Default(.showCalendar) private var showCalendar
     @Default(.showMirror) private var showMirror
     @Default(.showBatteryIndicator) private var showBattery
-    @State private var panel: OverviewPanel = .tools
+    @State private var panel: OverviewPanel = .dashboard
 
     private enum OverviewPanel: Equatable {
-        case tools
+        case dashboard
         case calendar
+        case focus
         case mirror
     }
 
+    private var hasTrack: Bool {
+        music.isPlaying || (!music.songTitle.isEmpty && music.songTitle != "I'm Handsome")
+    }
+
     var body: some View {
-        VStack(spacing: 7) {
+        VStack(spacing: 8) {
             panelContent
-                .frame(height: 133, alignment: .top)
-                .frame(maxWidth: .infinity, alignment: .top)
+                .frame(height: 132, alignment: .top)
+                .frame(maxWidth: .infinity)
 
             HStack(spacing: 5) {
-                panelButton("Tools", icon: "square.grid.2x2.fill", for: .tools)
-                if showCalendar {
-                    panelButton("Calendar", icon: "calendar", for: .calendar)
-                }
+                panelButton("Dashboard", icon: "square.grid.2x2.fill", for: .dashboard)
+                panelButton("Calendar", icon: "calendar", for: .calendar)
+                panelButton("Focus Timer", icon: "timer", for: .focus)
                 if showMirror {
                     panelButton("Mirror", icon: "web.camera", for: .mirror)
                 }
@@ -52,20 +56,16 @@ struct NotchToolsView: View {
                 }
             }
             .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(.white.opacity(0.78))
             .frame(height: 29)
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 18)
         }
         .padding(.top, 4)
         .frame(maxWidth: .infinity, alignment: .top)
         .buttonStyle(.plain)
-        .onChange(of: showCalendar) { _, enabled in
-            if !enabled && panel == .calendar { panel = .tools }
-        }
         .onChange(of: showMirror) { _, enabled in
             if !enabled && panel == .mirror {
                 stopMirror()
-                panel = .tools
+                panel = .dashboard
             }
         }
         .onChange(of: webcam.authorizationStatus) { _, status in
@@ -84,19 +84,34 @@ struct NotchToolsView: View {
     @ViewBuilder
     private var panelContent: some View {
         switch panel {
-        case .tools:
-            HStack(alignment: .top, spacing: 0) {
-                focusSection.frame(width: 184, alignment: .topLeading)
-                sectionDivider
-                appsSection.frame(width: 182, alignment: .topLeading)
-                sectionDivider
-                audioSection.frame(width: 170, alignment: .topLeading)
+        case .dashboard:
+            HStack(spacing: 12) {
+                nowPlayingCard.frame(maxWidth: .infinity)
+                appsSection.frame(width: 230, alignment: .topLeading)
             }
-            .padding(.top, 5)
+            .padding(.horizontal, 18)
         case .calendar:
-            CalendarView()
-                .frame(width: 570, height: 120)
-                .onHover { vm.isHoveringCalendar = $0 }
+            if showCalendar {
+                CalendarView()
+                    .frame(width: 570, height: 120)
+                    .onHover { vm.isHoveringCalendar = $0 }
+            } else {
+                VStack(spacing: 7) {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 25, weight: .light))
+                        .foregroundStyle(.cyan)
+                    Text("Calendar is off")
+                        .font(.system(size: 15, weight: .semibold))
+                    Text("Turn on events and reminders in Settings.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.white.opacity(0.58))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        case .focus:
+            focusSection
+                .frame(maxWidth: 570)
+                .padding(.horizontal, 28)
         case .mirror:
             HStack(spacing: 16) {
                 CameraPreviewView(webcamManager: webcam)
@@ -123,11 +138,12 @@ struct NotchToolsView: View {
             withAnimation(.snappy(duration: 0.25, extraBounce: 0)) { panel = target }
         } label: {
             Label(title, systemImage: icon)
-                .padding(.horizontal, 9)
+                .padding(.horizontal, 10)
                 .frame(height: 27)
                 .background(panel == target ? .white.opacity(0.16) : .clear, in: Capsule())
                 .contentShape(Capsule())
         }
+        .foregroundStyle(panel == target ? .white : .white.opacity(0.62))
         .accessibilityAddTraits(panel == target ? .isSelected : [])
     }
 
@@ -138,51 +154,98 @@ struct NotchToolsView: View {
         }
     }
 
-    private var sectionDivider: some View {
-        Rectangle()
-            .fill(.white.opacity(0.13))
-            .frame(width: 1, height: 106)
-            .padding(.horizontal, 10)
-            .padding(.top, 5)
+    private var nowPlayingCard: some View {
+        HStack(spacing: 12) {
+            Group {
+                if !hasTrack {
+                    Image(systemName: "music.note")
+                        .font(.system(size: 25, weight: .light))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .frame(width: 76, height: 76)
+                        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 13))
+                } else {
+                    Image(nsImage: music.albumArt)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 76, height: 76)
+                        .clipShape(RoundedRectangle(cornerRadius: 13))
+                }
+            }
             .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 5) {
+                Label("Now Playing", systemImage: "play.circle.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.cyan)
+                Text(hasTrack ? music.songTitle : "Nothing playing")
+                    .font(.system(size: 14, weight: .semibold))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Text(hasTrack ? music.artistName : "Your music will appear here.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.white.opacity(0.62))
+                    .lineLimit(1)
+                if hasTrack {
+                    HStack(spacing: 13) {
+                        Button { music.previousTrack() } label: {
+                            Image(systemName: "backward.fill")
+                        }
+                        .help("Previous track")
+                        Button { music.playPause() } label: {
+                            Image(systemName: music.isPlaying ? "pause.fill" : "play.fill")
+                        }
+                        .help(music.isPlaying ? "Pause" : "Play")
+                        Button { music.nextTrack() } label: {
+                            Image(systemName: "forward.fill")
+                        }
+                        .help("Next track")
+                    }
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.88))
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(height: 108)
+        .padding(.horizontal, 14)
+        .background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 17))
     }
 
     private var focusSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 5) {
-                Image(systemName: "timer").foregroundStyle(.cyan)
-                Text("Focus").foregroundStyle(.white)
-                Spacer(minLength: 0)
+        VStack(spacing: 9) {
+            HStack {
+                Label("Focus Timer", systemImage: "timer")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.cyan)
+                Spacer()
                 Menu {
                     Button("5 minutes") { focus.start(minutes: 5) }
                     Button("15 minutes") { focus.start(minutes: 15) }
                     Button("25 minutes") { focus.start(minutes: 25) }
                     Button("50 minutes") { focus.start(minutes: 50) }
                 } label: {
-                    Image(systemName: "ellipsis.circle")
+                    Label("Duration", systemImage: "ellipsis.circle")
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.white.opacity(0.75))
-                        .frame(width: 28, height: 28)
-                        .contentShape(Circle())
                 }
                 .menuStyle(.borderlessButton)
                 .help("Choose a focus duration")
             }
-            .font(.system(size: 13, weight: .semibold))
 
-            HStack(alignment: .center, spacing: 7) {
+            HStack(alignment: .center, spacing: 12) {
                 Text(focus.phase == .finished ? "Done" : focus.timeLabel)
-                    .font(.system(size: 27, weight: .semibold, design: .rounded))
+                    .font(.system(size: 44, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .contentTransition(.numericText())
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
                 Spacer(minLength: 0)
                 if focus.phase == .running || focus.phase == .paused {
                     Button { focus.reset() } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(.white.opacity(0.68))
-                            .frame(width: 28, height: 28)
+                            .frame(width: 32, height: 32)
+                            .background(.white.opacity(0.1), in: Circle())
                     }
                     .help("Reset focus timer")
                 }
@@ -194,9 +257,9 @@ struct NotchToolsView: View {
                     }
                 } label: {
                     Image(systemName: focus.phase == .running ? "pause.fill" : "play.fill")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(.black)
-                        .frame(width: 30, height: 30)
+                        .frame(width: 38, height: 38)
                         .background(.cyan, in: Circle())
                 }
                 .help(focus.phase == .running ? "Pause focus timer" : "Start focus timer")
@@ -206,16 +269,11 @@ struct NotchToolsView: View {
                 .tint(.cyan)
                 .controlSize(.mini)
                 .accessibilityLabel("Focus session progress")
-            if focus.phase == .finished {
-                Text("Session complete")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.65))
-            }
         }
     }
 
     private var appsSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 13) {
             HStack(spacing: 5) {
                 Image(systemName: "square.grid.2x2.fill").foregroundStyle(.cyan)
                 Text("Quick apps").foregroundStyle(.white)
@@ -229,9 +287,9 @@ struct NotchToolsView: View {
                     .help("Add a favorite app")
                 }
             }
-            .font(.system(size: 13, weight: .semibold))
+            .font(.system(size: 12, weight: .semibold))
 
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 ForEach(apps.favorites, id: \.self) { bundleID in
                     Button { apps.launch(bundleID) } label: {
                         Group {
@@ -241,8 +299,7 @@ struct NotchToolsView: View {
                                 Image(systemName: "app.dashed").resizable().scaledToFit()
                             }
                         }
-                        .frame(width: 32, height: 32)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 35, height: 35)
                     }
                     .help("Open \(apps.name(for: bundleID))")
                     .disabled(apps.appURL(for: bundleID) == nil)
@@ -253,47 +310,8 @@ struct NotchToolsView: View {
                     .foregroundStyle(.orange).lineLimit(2)
             }
         }
-    }
-
-    private var audioSection: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            Label("Sound output", systemImage: "speaker.wave.2.fill")
-                .labelStyle(.titleAndIcon)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white)
-
-            Menu {
-                ForEach(audio.devices) { device in
-                    Button { audio.select(device) } label: {
-                        Label(device.name, systemImage: device.id == audio.selectedID
-                            ? "checkmark" : device.symbol)
-                    }
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: audio.selectedDevice?.symbol ?? "speaker.slash")
-                        .font(.system(size: 15)).frame(width: 20)
-                    Text(audio.selectedDevice?.name ?? "No output")
-                        .font(.system(size: 12, weight: .medium))
-                        .lineLimit(2)
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.55))
-                }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 9)
-                .frame(height: 42)
-                .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 11))
-            }
-            .menuStyle(.borderlessButton)
-            .disabled(audio.devices.isEmpty)
-            .help(audio.selectedDevice?.name ?? "Choose sound output")
-
-            if let message = audio.message {
-                Text(message).font(.system(size: 11))
-                    .foregroundStyle(.orange).lineLimit(2)
-            }
-        }
+        .frame(height: 108, alignment: .top)
+        .padding(.horizontal, 14)
+        .background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 17))
     }
 }

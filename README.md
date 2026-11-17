@@ -24,13 +24,12 @@ Notchloom is a macOS notch utility built from [Boring Notch](https://github.com/
 ## What it does
 
 - **Music at a glance.** See artwork and playback status, use configurable controls, and show lyrics when available.
-- **Simple navigation.** Now Playing, Overview, and the optional Shelf sit beside the physical notch; swipe across the open notch to move between them.
+- **Simple navigation.** Now Playing, Overview, and the optional Shelf sit beside the physical notch; swipe across the open notch to move between them. Overview opens by default.
 - **A custom system HUD.** Show volume, brightness, and keyboard backlight changes in the notch, including a compact inline view when closed.
 - **Notifications from the notch.** The notch itself expands into one continuous black surface for visible macOS banners. Compact text, staged spring motion, hover pausing, and a queue keep alerts readable. Clock alerts stay visible longer; original macOS actions remain available.
 - **Focus time.** Start a 5, 15, 25, or 50 minute session, pause it, and see a quiet completion card. The timer survives app restarts.
 - **Quick apps.** Launch up to four favorite Mac apps from the notch and arrange them in Settings.
-- **Sound output.** See the current speaker or headphones and switch outputs from the notch.
-- **Quick tools.** Overview holds the camera mirror, calendar events and reminders, Focus, quick apps, sound output, and the optional battery widget. The file shelf and Quick Share remain available when enabled.
+- **Quick tools.** Overview has a Dashboard with Now Playing and quick apps, plus separate Calendar and Focus Timer tabs. Calendar shows an off message when disabled; the camera mirror and battery widget appear when enabled. The file shelf and Quick Share remain available when enabled.
 - **Fits your display.** Adjust notch sizing, hover behavior, gestures, and which displays show Notchloom.
 - **Your own look.** The settings window uses the Notchloom logo and a dark cyan and violet theme.
 
