@@ -290,6 +290,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Keep the running Dock tile tied to the icon in this build after updates.
+        if let iconURL = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
+           let icon = NSImage(contentsOf: iconURL) {
+            NSApplication.shared.applicationIconImage = icon
+        }
         NotificationMirror.shared.start()
         _ = FocusTimerManager.shared
         // Apply the login preference only on a fresh installation. Existing users keep
