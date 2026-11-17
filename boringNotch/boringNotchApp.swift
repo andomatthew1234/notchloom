@@ -9,6 +9,7 @@ import AVFoundation
 import Combine
 import Defaults
 import KeyboardShortcuts
+import LaunchAtLogin
 import Sparkle
 import SwiftUI
 
@@ -29,7 +30,7 @@ struct DynamicNotchApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra("boring.notch", systemImage: "sparkle", isInserted: $showMenuBarIcon) {
+        MenuBarExtra("Notchloom", systemImage: "sparkle", isInserted: $showMenuBarIcon) {
             Button("Settings") {
                 DispatchQueue.main.async {
                     SettingsWindowController.shared.showWindow()
@@ -38,7 +39,7 @@ struct DynamicNotchApp: App {
             .keyboardShortcut(KeyEquivalent(","), modifiers: .command)
             CheckForUpdatesView(updater: updaterController.updater)
             Divider()
-            Button("Restart Boring Notch") {
+            Button("Restart Notchloom") {
                 ApplicationRelauncher.restart()
             }
             Button("Quit", role: .destructive) {
@@ -280,6 +281,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Apply the login preference only on a fresh installation. Existing users keep
+        // their own login-item choice, and the marker prevents later re-registration.
+        let userDefaults = UserDefaults.standard
+        let installedInApplications = Bundle.main.bundleURL.path.hasPrefix("/Applications/")
+            || Bundle.main.bundleURL.path.hasPrefix(NSHomeDirectory() + "/Applications/")
+        if installedInApplications && userDefaults.object(forKey: "notchloomConfiguredLoginDefault") == nil {
+            let isFreshInstall = userDefaults.object(forKey: "firstLaunch") == nil
+            userDefaults.set(true, forKey: "notchloomConfiguredLoginDefault")
+            if isFreshInstall {
+                LaunchAtLogin.isEnabled = true
+            }
+        }
 
         NotificationCenter.default.addObserver(
             self,

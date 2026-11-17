@@ -488,7 +488,6 @@ struct HUD: View {
                     .labelsHidden()
                     .toggleStyle(.switch)
                     .controlSize(.large)
-                    .disabled(!accessibilityAuthorized)
                 }
                 
                 if !accessibilityAuthorized {
@@ -581,7 +580,9 @@ struct HUD: View {
             XPCHelperClient.shared.startMonitoringAccessibilityAuthorization()
         }
         .onDisappear {
-            XPCHelperClient.shared.stopMonitoringAccessibilityAuthorization()
+            if !Defaults[.hudReplacement] {
+                XPCHelperClient.shared.stopMonitoringAccessibilityAuthorization()
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .accessibilityAuthorizationChanged)) { notification in
             if let granted = notification.userInfo?["granted"] as? Bool {
@@ -838,6 +839,15 @@ struct About: View {
     @Environment(\.openWindow) var openWindow
     var body: some View {
         VStack {
+            VStack(spacing: 6) {
+                Image("NotchloomIcon")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 64, height: 64)
+                Text("Notchloom")
+                    .font(.headline)
+            }
+            .padding(.top, 10)
             Form {
                 Section {
                     HStack {
@@ -870,7 +880,7 @@ struct About: View {
                 HStack(spacing: 30) {
                     Spacer(minLength: 0)
                     Button {
-                        if let url = URL(string: "https://github.com/TheBoredTeam/boring.notch") {
+                        if let url = URL(string: "https://github.com/andomatthew1234/notchloom") {
                             NSWorkspace.shared.open(url)
                         }
                     } label: {
@@ -889,7 +899,7 @@ struct About: View {
             }
             VStack(spacing: 0) {
                 Divider()
-                Text("Made with 🫶🏻 by not so boring not.people")
+                Text("Notchloom is based on Boring Notch by TheBoredTeam")
                     .foregroundStyle(.secondary)
                     .padding(.top, 5)
                     .padding(.bottom, 7)
