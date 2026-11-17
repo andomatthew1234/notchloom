@@ -12,7 +12,6 @@ struct NotchToolsView: View {
     @Default(.showCalendar) private var showCalendar
     @Default(.showMirror) private var showMirror
     @Default(.showBatteryIndicator) private var showBattery
-    @Default(.settingsIconInNotch) private var showSettings
     @State private var panel: OverviewPanel = .tools
 
     private enum OverviewPanel: Equatable {
@@ -50,16 +49,6 @@ struct NotchToolsView: View {
                     )
                     .frame(width: 30, height: 28)
                     .help("Battery in Overview")
-                }
-                if showSettings {
-                    Button {
-                        SettingsWindowController.shared.showWindow()
-                    } label: {
-                        Image(systemName: "gearshape")
-                            .frame(width: 28, height: 28)
-                            .contentShape(Circle())
-                    }
-                    .help("Notchloom Settings")
                 }
             }
             .font(.system(size: 11, weight: .semibold))

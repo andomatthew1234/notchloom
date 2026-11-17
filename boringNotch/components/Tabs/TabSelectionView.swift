@@ -27,7 +27,7 @@ struct TabSelectionView: View {
     @Namespace private var selectionAnimation
 
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 7) {
             ForEach(tabs) { tab in
                 if tab.view != .shelf || shelfEnabled {
                     Button {
@@ -35,15 +35,15 @@ struct TabSelectionView: View {
                             coordinator.currentView = tab.view
                         }
                     } label: {
-                        VStack(spacing: 0) {
+                        VStack(spacing: 1) {
                             Image(systemName: tab.icon)
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(.system(size: 11, weight: .semibold))
                             Text(tab.label)
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(.system(size: 11, weight: .semibold))
                         }
                         .foregroundStyle(coordinator.currentView == tab.view ? .white : .white.opacity(0.68))
-                        .padding(.horizontal, 3)
-                        .frame(height: 27)
+                        .padding(.horizontal, 7)
+                        .frame(height: 29)
                         .lineLimit(1)
                         .contentShape(Capsule())
                     }

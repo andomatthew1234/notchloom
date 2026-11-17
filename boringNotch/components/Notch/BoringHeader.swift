@@ -12,6 +12,7 @@ struct BoringHeader: View {
     @EnvironmentObject var vm: BoringViewModel
     @ObservedObject var coordinator = BoringViewCoordinator.shared
     @StateObject var tvm = ShelfStateViewModel.shared
+    @Default(.settingsIconInNotch) private var showSettings
 
     private var showsTabs: Bool {
         coordinator.alwaysShowTabs || (!tvm.isEmpty && Defaults[.boringShelf])
@@ -19,7 +20,7 @@ struct BoringHeader: View {
     }
 
     private var headerHeight: CGFloat {
-        max(32, vm.effectiveClosedNotchHeight)
+        max(36, vm.effectiveClosedNotchHeight)
     }
 
     private var contentWidth: CGFloat {
@@ -33,7 +34,21 @@ struct BoringHeader: View {
 
         HStack(spacing: 0) {
             HStack(spacing: 0) {
-                Spacer(minLength: 0)
+                if showSettings {
+                    Button {
+                        SettingsWindowController.shared.showWindow()
+                    } label: {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.8))
+                            .frame(width: 28, height: 28)
+                            .background(.white.opacity(0.09), in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Notchloom Settings")
+                    .accessibilityLabel("Notchloom Settings")
+                }
+                Spacer(minLength: 6)
                 if showsTabs {
                     TabSelectionView()
                 } else {
