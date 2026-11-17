@@ -67,8 +67,40 @@ private struct NotchloomSettingsHeader: View {
     }
 }
 
+private enum SettingsCategory: String {
+    case general, appearance, notchContent, app
+
+    var title: String {
+        switch self {
+        case .general: "General"
+        case .appearance: "Appearance"
+        case .notchContent: "Choose what shows in the notch"
+        case .app: "App"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .general: "gearshape"
+        case .appearance: "paintbrush.pointed"
+        case .notchContent: "rectangle.topthird.inset.filled"
+        case .app: "app"
+        }
+    }
+
+    var firstPage: String {
+        switch self {
+        case .general: "General"
+        case .appearance: "Appearance"
+        case .notchContent: "QuickApps"
+        case .app: "Shortcuts"
+        }
+    }
+}
+
 struct SettingsView: View {
     @State private var selectedTab = "General"
+    @State private var expandedCategory: SettingsCategory? = .general
     @State private var accentColorUpdateTrigger = UUID()
 
     let updaterController: SPUStandardUpdaterController?
@@ -81,12 +113,13 @@ struct SettingsView: View {
         switch selectedTab {
         case "General": return ("General", "Choose where Notchloom appears and how it opens.", "gearshape")
         case "Appearance": return ("Appearance", "Adjust the look of the notch and music player.", "paintbrush.pointed")
-        case "Media": return ("Media", "Pick your music source, controls, and playback behavior.", "music.note")
+        case "Media": return ("Now playing", "Pick your music source, controls, and playback behavior.", "music.note")
+        case "NotchHeight": return ("Notch height", "Match the physical notch or choose your own height for each display.", "arrow.up.and.down")
         case "QuickApps": return ("Quick apps", "Choose the apps one click away in the notch.", "square.grid.2x2")
         case "Notifications": return ("Notifications", "See new app banners emerge from the notch.", "bell.badge")
         case "Calendar": return ("Calendar", "Choose which events and reminders appear in the notch.", "calendar")
-        case "HUD": return ("System HUD", "Show volume and brightness changes around the notch.", "slider.horizontal.3")
-        case "Battery": return ("Battery", "Control charging alerts and battery details.", "battery.100.bolt")
+        case "HUD": return ("Volume, battery & system HUDs", "Choose how system changes appear around the notch.", "slider.horizontal.3")
+        case "Battery": return ("Battery notch widget", "Show your Mac’s battery beside the notch and choose its details.", "battery.100.bolt")
         case "Shelf": return ("File shelf", "Keep files handy and choose how to share them.", "square.stack.3d.up")
         case "Shortcuts": return ("Shortcuts", "Set keyboard shortcuts for quick actions.", "keyboard")
         case "Advanced": return ("Advanced", "Fine-tune colors, windows, and display behavior.", "gearshape.2")
@@ -114,47 +147,61 @@ struct SettingsView: View {
                 .padding(.vertical, 12)
                 .listRowBackground(Color.clear)
                 .accessibilityElement(children: .combine)
-                Section("YOUR NOTCH") {
-                    NavigationLink(value: "General") {
-                        Label("General", systemImage: "gearshape")
-                    }
-                    NavigationLink(value: "Appearance") {
-                        Label("Appearance", systemImage: "paintbrush.pointed")
-                    }
+                categoryRow(.general)
+                categoryRow(.appearance)
+                if expandedCategory == .appearance {
                     NavigationLink(value: "Media") {
-                        Label("Media", systemImage: "music.note")
+                        Label("Now playing", systemImage: "music.note")
                     }
+                    .padding(.leading, 16)
+                    NavigationLink(value: "NotchHeight") {
+                        Label("Notch height", systemImage: "arrow.up.and.down")
+                    }
+                    .padding(.leading, 16)
+                    NavigationLink(value: "HUD") {
+                        Label("Volume, battery & system HUDs", systemImage: "slider.horizontal.3")
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.leading, 16)
+                    NavigationLink(value: "Battery") {
+                        Label("Battery notch widget", systemImage: "battery.100.bolt")
+                    }
+                    .padding(.leading, 16)
                 }
-                Section("TOOLS") {
+                categoryRow(.notchContent)
+                if expandedCategory == .notchContent {
                     NavigationLink(value: "QuickApps") {
                         Label("Quick apps", systemImage: "square.grid.2x2")
                     }
+                    .padding(.leading, 16)
                     NavigationLink(value: "Notifications") {
                         Label("Notifications", systemImage: "bell.badge")
                     }
-                    NavigationLink(value: "HUD") {
-                        Label("System HUD", systemImage: "slider.horizontal.3")
-                    }
+                    .padding(.leading, 16)
                     NavigationLink(value: "Calendar") {
                         Label("Calendar", systemImage: "calendar")
                     }
-                    NavigationLink(value: "Battery") {
-                        Label("Battery", systemImage: "battery.100.bolt")
-                    }
+                    .padding(.leading, 16)
                     NavigationLink(value: "Shelf") {
                         Label("File shelf", systemImage: "square.stack.3d.up")
                     }
+                    .padding(.leading, 16)
                 }
-                Section("APP") {
+                categoryRow(.app)
+                if expandedCategory == .app {
                     NavigationLink(value: "Shortcuts") {
                         Label("Shortcuts", systemImage: "keyboard")
                     }
+                    .padding(.leading, 16)
                     NavigationLink(value: "Advanced") {
                         Label("Advanced", systemImage: "gearshape.2")
                     }
+                    .padding(.leading, 16)
                     NavigationLink(value: "About") {
                         Label("About", systemImage: "info.circle")
                     }
+                    .padding(.leading, 16)
                 }
             }
             .listStyle(SidebarListStyle())
@@ -170,7 +217,7 @@ struct SettingsView: View {
             .tint(NotchloomTheme.cyan)
             .accentColor(NotchloomTheme.cyan)
             .toolbar(removing: .sidebarToggle)
-            .navigationSplitViewColumnWidth(205)
+            .navigationSplitViewColumnWidth(265)
         } detail: {
             VStack(spacing: 0) {
                 NotchloomSettingsHeader(
@@ -185,6 +232,8 @@ struct SettingsView: View {
                     Appearance()
                 case "Media":
                     Media()
+                case "NotchHeight":
+                    NotchHeightSettings()
                 case "QuickApps":
                     QuickAppsSettings()
                 case "Notifications":
@@ -194,7 +243,7 @@ struct SettingsView: View {
                 case "HUD":
                     HUD()
                 case "Battery":
-                    Charge()
+                    BatteryNotchSettings()
                 case "Shelf":
                     Shelf()
                 case "Shortcuts":
@@ -230,7 +279,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(minWidth: 840, idealWidth: 860, minHeight: 620, idealHeight: 680)
+        .frame(minWidth: 900, idealWidth: 940, minHeight: 620, idealHeight: 680)
         .background(NotchloomTheme.ink)
         .tint(NotchloomTheme.cyan)
         .accentColor(NotchloomTheme.cyan)
@@ -239,6 +288,36 @@ struct SettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("AccentColorChanged"))) { _ in
             accentColorUpdateTrigger = UUID()
         }
+    }
+
+    private func categoryRow(_ category: SettingsCategory) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                expandedCategory = expandedCategory == category ? nil : category
+                selectedTab = category.firstPage
+            }
+        } label: {
+            HStack(spacing: 10) {
+                Label(category.title, systemImage: category.symbol)
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                if category != .general {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .rotationEffect(.degrees(expandedCategory == category ? 90 : 0))
+                        .accessibilityHidden(true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.vertical, 5)
+        .listRowBackground(expandedCategory == category ? NotchloomTheme.cyan.opacity(0.12) : Color.clear)
+        .accessibilityLabel(category.title)
+        .accessibilityHint(category == .general ? "Open General settings" : "Expand settings category")
     }
 }
 
@@ -254,10 +333,6 @@ struct GeneralSettings: View {
     @Default(.showEmojis) var showEmojis
     @Default(.gestureSensitivity) var gestureSensitivity
     @Default(.minimumHoverDuration) var minimumHoverDuration
-    @Default(.nonNotchHeight) var nonNotchHeight
-    @Default(.nonNotchHeightMode) var nonNotchHeightMode
-    @Default(.notchHeight) var notchHeight
-    @Default(.notchHeightMode) var notchHeightMode
     @Default(.showOnAllDisplays) var showOnAllDisplays
     @Default(.automaticallySwitchDisplay) var automaticallySwitchDisplay
     @Default(.enableGestures) var enableGestures
@@ -310,74 +385,6 @@ struct GeneralSettings: View {
                 Text(showOnAllDisplays
                      ? "Turn off Show on all displays to choose a preferred display."
                      : "Choose a preferred display, or follow the active display automatically.")
-            }
-
-            Section {
-                Picker(
-                    selection: $notchHeightMode,
-                    label: Text("On a Mac with a notch")
-                ) {
-                    Text("Match real notch height")
-                        .tag(WindowHeightMode.matchRealNotchSize)
-                    Text("Match menu bar height")
-                        .tag(WindowHeightMode.matchMenuBar)
-                    Text("Custom height")
-                        .tag(WindowHeightMode.custom)
-                }
-                .onChange(of: notchHeightMode) {
-                    switch notchHeightMode {
-                    case .matchRealNotchSize:
-                        notchHeight = 38
-                    case .matchMenuBar:
-                        notchHeight = 44
-                    case .custom:
-                        notchHeight = 38
-                    }
-                    NotificationCenter.default.post(
-                        name: Notification.Name.notchHeightChanged, object: nil)
-                }
-                if notchHeightMode == .custom {
-                    Slider(value: $notchHeight, in: 15...45, step: 1) {
-                        Text("Height: \(notchHeight, specifier: "%.0f") pt")
-                    }
-                    .onChange(of: notchHeight) {
-                        NotificationCenter.default.post(
-                            name: Notification.Name.notchHeightChanged, object: nil)
-                    }
-                }
-                Picker("On other displays", selection: $nonNotchHeightMode) {
-                    Text("Match menubar height")
-                        .tag(WindowHeightMode.matchMenuBar)
-                    Text("Match real notch height")
-                        .tag(WindowHeightMode.matchRealNotchSize)
-                    Text("Custom height")
-                        .tag(WindowHeightMode.custom)
-                }
-                .onChange(of: nonNotchHeightMode) {
-                    switch nonNotchHeightMode {
-                    case .matchMenuBar:
-                        nonNotchHeight = 24
-                    case .matchRealNotchSize:
-                        nonNotchHeight = 32
-                    case .custom:
-                        nonNotchHeight = 32
-                    }
-                    NotificationCenter.default.post(
-                        name: Notification.Name.notchHeightChanged, object: nil)
-                }
-                if nonNotchHeightMode == .custom {
-                    Slider(value: $nonNotchHeight, in: 0...40, step: 1) {
-                        Text("Height: \(nonNotchHeight, specifier: "%.0f") pt")
-                    }
-                    .onChange(of: nonNotchHeight) {
-                        NotificationCenter.default.post(
-                            name: Notification.Name.notchHeightChanged, object: nil)
-                    }
-                }
-            } header: {
-                Text("Notch height")
-            } footer: {
-                Text("Automatic sizes match the physical notch or menu bar. Choose Custom height to set your own size.")
             }
 
             gestureControls()
@@ -457,35 +464,111 @@ struct GeneralSettings: View {
     }
 }
 
-struct Charge: View {
+struct NotchHeightSettings: View {
+    @Default(.notchHeight) private var notchHeight
+    @Default(.notchHeightMode) private var notchHeightMode
+    @Default(.nonNotchHeight) private var nonNotchHeight
+    @Default(.nonNotchHeightMode) private var nonNotchHeightMode
+
+    var body: some View {
+        Form {
+            Section {
+                Picker(
+                    selection: $notchHeightMode,
+                    label: Text("On a Mac with a notch")
+                ) {
+                    Text("Match real notch height")
+                        .tag(WindowHeightMode.matchRealNotchSize)
+                    Text("Match menu bar height")
+                        .tag(WindowHeightMode.matchMenuBar)
+                    Text("Custom height")
+                        .tag(WindowHeightMode.custom)
+                }
+                .onChange(of: notchHeightMode) {
+                    switch notchHeightMode {
+                    case .matchRealNotchSize:
+                        notchHeight = 38
+                    case .matchMenuBar:
+                        notchHeight = 44
+                    case .custom:
+                        notchHeight = 38
+                    }
+                    NotificationCenter.default.post(
+                        name: Notification.Name.notchHeightChanged, object: nil)
+                }
+                if notchHeightMode == .custom {
+                    Slider(value: $notchHeight, in: 15...45, step: 1) {
+                        Text("Height: \(notchHeight, specifier: "%.0f") pt")
+                    }
+                    .onChange(of: notchHeight) {
+                        NotificationCenter.default.post(
+                            name: Notification.Name.notchHeightChanged, object: nil)
+                    }
+                }
+                Picker("On other displays", selection: $nonNotchHeightMode) {
+                    Text("Match menu bar height")
+                        .tag(WindowHeightMode.matchMenuBar)
+                    Text("Match real notch height")
+                        .tag(WindowHeightMode.matchRealNotchSize)
+                    Text("Custom height")
+                        .tag(WindowHeightMode.custom)
+                }
+                .onChange(of: nonNotchHeightMode) {
+                    switch nonNotchHeightMode {
+                    case .matchMenuBar:
+                        nonNotchHeight = 24
+                    case .matchRealNotchSize:
+                        nonNotchHeight = 32
+                    case .custom:
+                        nonNotchHeight = 32
+                    }
+                    NotificationCenter.default.post(
+                        name: Notification.Name.notchHeightChanged, object: nil)
+                }
+                if nonNotchHeightMode == .custom {
+                    Slider(value: $nonNotchHeight, in: 0...40, step: 1) {
+                        Text("Height: \(nonNotchHeight, specifier: "%.0f") pt")
+                    }
+                    .onChange(of: nonNotchHeight) {
+                        NotificationCenter.default.post(
+                            name: Notification.Name.notchHeightChanged, object: nil)
+                    }
+                }
+            } header: {
+                Text("Notch height")
+            } footer: {
+                Text("Automatic sizes match the physical notch or menu bar. Choose Custom height to set your own size.")
+            }
+        }
+        .tint(NotchloomTheme.cyan)
+    }
+}
+
+struct BatteryNotchSettings: View {
+    @Default(.showBatteryIndicator) private var showBatteryIndicator
+
     var body: some View {
         Form {
             Section {
                 Defaults.Toggle(key: .showBatteryIndicator) {
-                    Text("Show battery indicator")
-                }
-                Defaults.Toggle(key: .showPowerStatusNotifications) {
-                    Text("Show power status notifications")
+                    Text("Show battery beside the notch")
                 }
             } header: {
-                Text("Battery indicator")
+                Text("Battery notch widget")
             } footer: {
-                Text("Choose whether Notchloom shows battery status beside the notch and alerts you when power changes.")
+                Text("This small battery indicator sits beside the MacBook notch while Notchloom is open. Charging alerts have their own setting under Volume, battery & system HUDs.")
             }
-            Section {
-                Defaults.Toggle(key: .showBatteryPercentage) {
-                    Text("Show battery percentage")
+            if showBatteryIndicator {
+                Section {
+                    Defaults.Toggle(key: .showBatteryPercentage) {
+                        Text("Show battery percentage")
+                    }
+                    Defaults.Toggle(key: .showPowerStatusIcons) {
+                        Text("Show charging status icon")
+                    }
+                } header: {
+                    Text("Widget details")
                 }
-                Defaults.Toggle(key: .showPowerStatusIcons) {
-                    Text("Show power status icons")
-                }
-            } header: {
-                Text("Battery details")
-            }
-        }
-        .onAppear {
-            Task { @MainActor in
-                await XPCHelperClient.shared.isAccessibilityAuthorized()
             }
         }
         .tint(NotchloomTheme.cyan)
@@ -583,6 +666,16 @@ struct HUD: View {
     
     var body: some View {
         Form {
+            Section {
+                Defaults.Toggle(key: .showPowerStatusNotifications) {
+                    Text("Show power status notifications")
+                }
+            } header: {
+                Text("Battery power alerts")
+            } footer: {
+                Text("Show a brief notch alert when the Mac starts or stops charging. This works independently of the battery notch widget and system HUD replacement.")
+            }
+
             Section {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
