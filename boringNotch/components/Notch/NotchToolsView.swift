@@ -7,8 +7,11 @@ struct NotchToolsView: View {
     @ObservedObject private var focus = FocusTimerManager.shared
     @ObservedObject private var apps = QuickAppsManager.shared
     @ObservedObject private var music = MusicManager.shared
+    @ObservedObject private var coordinator = BoringViewCoordinator.shared
     @ObservedObject private var webcam = WebcamManager.shared
     @ObservedObject private var battery = BatteryStatusViewModel.shared
+    @StateObject private var shelf = ShelfStateViewModel.shared
+    @Default(.boringShelf) private var shelfEnabled
     @Default(.showCalendar) private var showCalendar
     @Default(.showMirror) private var showMirror
     @Default(.showBatteryIndicator) private var showBattery
@@ -87,12 +90,23 @@ struct NotchToolsView: View {
     private var panelContent: some View {
         switch panel {
         case .dashboard:
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 nowPlayingSlot
+                if focus.phase == .running {
+                    focusDashboardCard
+                        .transition(.opacity.combined(with: .scale(scale: 0.94)))
+                }
+                if shelfEnabled && !shelf.isEmpty {
+                    shelfDashboardCard
+                        .transition(.opacity.combined(with: .scale(scale: 0.94)))
+                }
                 Spacer(minLength: 0)
                 appsSection.frame(width: 230, alignment: .topLeading)
             }
             .padding(.horizontal, 18)
+            .animation(.smooth(duration: 0.25), value: focus.phase)
+            .animation(.smooth(duration: 0.25), value: shelf.items.count)
+            .animation(.smooth(duration: 0.25), value: shelfEnabled)
         case .calendar:
             if showCalendar {
                 CalendarView()
@@ -240,6 +254,73 @@ struct NotchToolsView: View {
         .help(label)
     }
 
+    private var focusDashboardCard: some View {
+        Button {
+            withAnimation(.snappy(duration: 0.25, extraBounce: 0)) {
+                panel = .focus
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: 0) {
+                Label("Focus", systemImage: "timer")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.cyan)
+                Spacer(minLength: 0)
+                Text(focus.timeLabel)
+                    .font(.system(size: 25, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+                    .foregroundStyle(.white)
+                ProgressView(value: focus.progress)
+                    .tint(.cyan)
+                    .controlSize(.mini)
+                    .padding(.top, 6)
+            }
+            .padding(12)
+            .frame(width: 136, height: 112)
+            .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
+            .contentShape(RoundedRectangle(cornerRadius: 16))
+        }
+        .accessibilityLabel("Focus in progress, \(focus.timeLabel) remaining. Open Focus Timer")
+        .help("Open Focus Timer")
+    }
+
+    private var shelfDashboardCard: some View {
+        Button {
+            withAnimation(.snappy(duration: 0.28, extraBounce: 0)) {
+                coordinator.currentView = .shelf
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: 0) {
+                Label("Shelf ready", systemImage: "tray.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.cyan)
+                Spacer(minLength: 0)
+                HStack(alignment: .bottom, spacing: 0) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(shelf.items.count.formatted())
+                            .font(.system(size: 23, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white)
+                        Text(shelf.items.count == 1 ? "item" : "items")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.white.opacity(0.58))
+                    }
+                    Spacer(minLength: 2)
+                    HStack(spacing: -8) {
+                        ForEach(Array(shelf.items.prefix(2))) { item in
+                            ShelfDashboardThumbnail(item: item)
+                        }
+                    }
+                }
+            }
+            .padding(12)
+            .frame(width: 150, height: 112)
+            .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
+            .contentShape(RoundedRectangle(cornerRadius: 16))
+        }
+        .accessibilityLabel("Shelf ready, \(shelf.items.count) \(shelf.items.count == 1 ? "item" : "items"). Open Shelf")
+        .help("Open Shelf")
+    }
+
     private var focusSection: some View {
         VStack(spacing: 9) {
             HStack {
@@ -342,5 +423,28 @@ struct NotchToolsView: View {
         .frame(height: 108, alignment: .top)
         .padding(.horizontal, 14)
         .background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 17))
+    }
+}
+
+private struct ShelfDashboardThumbnail: View {
+    let item: ShelfItem
+    @State private var thumbnail: NSImage?
+
+    var body: some View {
+        Image(nsImage: thumbnail ?? item.icon)
+            .resizable()
+            .scaledToFill()
+            .frame(width: 32, height: 32)
+            .clipShape(RoundedRectangle(cornerRadius: 7))
+            .overlay {
+                RoundedRectangle(cornerRadius: 7)
+                    .strokeBorder(.black.opacity(0.8), lineWidth: 1.5)
+            }
+            .accessibilityHidden(true)
+            .task(id: item.id) {
+                guard let url = item.fileURL else { return }
+                thumbnail = await ThumbnailService.shared.thumbnail(
+                    for: url, size: CGSize(width: 48, height: 48))
+            }
     }
 }
