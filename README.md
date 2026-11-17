@@ -1,17 +1,57 @@
-# Notchloom
+<p align="center">
+  <img src="boringNotch/Assets.xcassets/AppIcon.appiconset/notchloom-256.png" width="128" height="128" alt="Notchloom app icon: cyan and violet threads woven around a notch">
+</p>
 
-![Notchloom icon](branding/notchloom-generated.png)
+<h1 align="center">Notchloom</h1>
 
-Notchloom is a personal fork of [Boring Notch](https://github.com/TheBoredTeam/boring.notch), a macOS notch utility. It keeps the upstream features and starts new users with the settings used for this fork. Existing users' saved preferences are respected.
+<p align="center">
+  <strong>Your notch, woven in.</strong><br>
+  Music, useful controls, and system feedback in the space around your Mac's notch.
+</p>
 
-## Status
+<p align="center">
+  <a href="https://github.com/andomatthew1234/notchloom/actions/workflows/cicd.yml"><img src="https://github.com/andomatthew1234/notchloom/actions/workflows/cicd.yml/badge.svg" alt="Notchloom macOS build status"></a>
+  &nbsp;·&nbsp;
+  <a href="LICENSE">GPL-3.0 license</a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/TheBoredTeam/boring.notch">Based on Boring Notch</a>
+</p>
 
-The source builds locally, but a public signed and notarized binary has not been released yet. The upstream project's download and Homebrew links install **Boring Notch**, not Notchloom. See the [upstream README](docs/UPSTREAM_README.md) for the original project documentation.
-The upstream release and nightly publishing workflows were removed because their signing and download links belong to the original project.
+---
+
+Notchloom is a macOS notch utility built from [Boring Notch](https://github.com/TheBoredTeam/boring.notch). Hover over the notch to open a small space for music and quick tools. When it is closed, playback and system events can still appear at the top of your display. The fork adds its own name, cyan and violet icon, matching settings, and a branded drag-to-Applications installer.
+
+## What it does
+
+- **Music at a glance.** See artwork and playback status, use configurable controls, and show lyrics when available.
+- **A custom system HUD.** Show volume, brightness, and keyboard backlight changes in the notch, including a compact inline view when closed.
+- **Quick tools.** Open a camera mirror, view calendar events and reminders, or use the file shelf and Quick Share when you enable them.
+- **Fits your display.** Adjust notch sizing, hover behavior, gestures, and which displays show Notchloom.
+- **Your own look.** The settings window uses the Notchloom logo and a dark cyan and violet theme.
+
+The main controls remain customizable. Notchloom's starting choices reflect this fork's preferred setup; they do not lock anyone into it.
+
+## Install status
+
+**There is no public signed and notarized Notchloom download yet.** The themed DMG has been built and tested locally, but the app currently uses an Apple Development signature. The original project's download and Homebrew links install **Boring Notch**, not this fork.
+
+You can [build Notchloom from source](#build-from-source). A public installer is pending distribution signing and notarization.
+
+## Defaults on a fresh install
+
+| Area | Starting choice |
+| --- | --- |
+| General | Launch at login; show on all displays; hide the menu bar icon |
+| Interaction | Open immediately on hover; use an extended hover area and gestures |
+| Music | Show lyrics and live activity; use Shuffle, Previous, Play/Pause, Next, and Favorite controls |
+| Appearance | Enable the camera mirror and album-art slider colors; leave Calendar and the file shelf off |
+| HUD | Replace the system HUD after Accessibility is granted; use the inline style with glow, accent tint, and percentages |
+
+Existing preferences stay in place when upgrading. Permissions, completed onboarding, and device-specific display IDs are never copied from the maintainer's Mac. Camera access is needed for the mirror; Accessibility access is needed for HUD replacement and media-key interception.
 
 ## Build from source
 
-Requirements: macOS 15.6 or later and Xcode 26 or later.
+You need macOS 15.6 or later and Xcode 26 or later.
 
 ```bash
 git clone https://github.com/andomatthew1234/notchloom.git
@@ -19,35 +59,20 @@ cd notchloom
 open boringNotch.xcodeproj
 ```
 
-Select the `boringNotch` scheme, choose your own Apple Development signing team, and build. The resulting app is named **Notchloom**. On a fresh install, macOS may ask for Camera and Accessibility access before the mirror and HUD features work.
+Select the `boringNotch` scheme, choose your Apple Development signing team, and build. Xcode produces **Notchloom.app**. The internal project and bundle identifiers retain their upstream names so existing Boring Notch preferences can migrate.
 
-## Defaults for new users
+### Build the themed installer
 
-| Area | Default |
-| --- | --- |
-| General | Launch at login on; menu bar icon off; show on all displays and on the lock screen |
-| Notch | Open on hover immediately; extended hover area; gestures and close gesture on; high gesture sensitivity |
-| Sizing | Match real notch height on notch displays; match menu bar height on other displays |
-| Appearance | Mirror on; calendar and idle face off; slider color matches album art |
-| Music | Now Playing when supported; music live activity and lyrics on; Shuffle, Previous, Play/Pause, Next, Favorite controls; hide in full screen for the media app only |
-| Battery and shelf | Battery indicator off; shelf off; AirDrop selected for Quick Share |
-| HUD | Replacement enabled once Accessibility is granted; Inline style; percentages in open and closed notch; accent tint and glow on; gradient off |
-| Updates | Automatic checks on; automatic installation off; feed points to this fork |
-
-Screen identifiers, completed onboarding, permissions, and other device-specific state are not copied from the maintainer's Mac. The default login item is registered only on a fresh installation; later user choices are preserved. Users can change all settings in the app.
-
-The fork's [appcast](appcast.xml) is empty until the first signed binary release. The update signing private key is kept outside the repository.
-
-## Installer
-
-The branded drag-to-Applications disk image is built from a signed Release app:
+With a signed Release app and [`uv`](https://docs.astral.sh/uv/) installed, run:
 
 ```bash
 installer/build_dmg.sh /path/to/Notchloom.app
 ```
 
-The script uses `uvx` to run a pinned `dmgbuild` version and writes the versioned image to `dist/`. Its Finder artwork and layout live in [`installer/`](installer/). The disk image made for local testing uses an Apple Development signature; a public Mac download still needs a Developer ID signature and Apple notarization.
+The script uses a pinned `dmgbuild` version and writes `dist/Notchloom-<version>.dmg`. The [installer artwork and layout](installer/) are included in this repository. The local DMG is not a substitute for a Developer ID signed and notarized public release.
 
-## Credits and license
+## Updates, credits, and license
 
-Based on Boring Notch by [TheBoredTeam](https://github.com/TheBoredTeam/boring.notch). Notchloom retains the project's [GNU GPLv3 license](LICENSE). The Notchloom icon was generated for this fork and prepared for the macOS app icon asset catalog.
+The [Notchloom appcast](appcast.xml) is empty until the first public binary release. Update checks point to this fork, so Notchloom will not install an upstream Boring Notch build.
+
+Notchloom is based on [Boring Notch by TheBoredTeam](https://github.com/TheBoredTeam/boring.notch). The original README is preserved in [docs/UPSTREAM_README.md](docs/UPSTREAM_README.md). This fork keeps the project's [GNU GPLv3 license](LICENSE). The Notchloom icon was generated for this fork and prepared as a macOS app icon.
