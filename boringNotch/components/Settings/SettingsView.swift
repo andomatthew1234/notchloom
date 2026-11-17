@@ -1009,7 +1009,7 @@ struct NotificationsSettings: View {
                 } header: {
                     Text("Try it")
                 } footer: {
-                    Text("The notch expands to show one notification at a time. Hover to keep it visible; click elsewhere to dismiss. Alerts wait while you use the open notch. Clicking a recognized app opens it; reply, snooze, and other actions remain on the original macOS notification.")
+                    Text("The notch shows one notification at a time. Hover to pause dismissal and reveal the close button, or swipe up with two fingers to dismiss. Alerts wait while you use the open notch. Clicking a recognized app opens it; reply, snooze, and other actions remain on the original macOS notification.")
                 }
             }
         }

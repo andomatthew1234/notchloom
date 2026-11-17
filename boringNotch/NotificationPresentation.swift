@@ -53,7 +53,7 @@ class NotificationPresentation: ObservableObject {
     @Published private(set) var receivedAt = Date()
     private(set) var queued: [NotchNotification] = []
     private var blockedSurfaces: Set<String> = []
-    private var hoveringSurfaces: Set<String> = []
+    @Published private(set) var hoveringSurfaces: Set<String> = []
     private var surfaces: [String: CGRect] = [:]
     private var sequence: Task<Void, Never>?
     private var settling: Task<Void, Never>?
@@ -105,6 +105,7 @@ class NotificationPresentation: ObservableObject {
     }
 
     func setHovered(_ hovered: Bool, on id: String) {
+        guard hoveringSurfaces.contains(id) != hovered else { return }
         if hovered { hoveringSurfaces.insert(id) } else { hoveringSurfaces.remove(id) }
         if !hoveringSurfaces.isEmpty {
             if let deadline { remaining = max(0, deadline - ProcessInfo.processInfo.systemUptime) }
@@ -331,6 +332,107 @@ struct NotificationSurfaceLayout: Layout {
     }
 }
 
+/// Recognizes one deliberate two-finger upward swipe per trackpad gesture.
+struct NotificationDismissSwipeAccumulator {
+    private(set) var distance: CGFloat = 0
+    private(set) var handled = false
+
+    mutating func reset() {
+        distance = 0
+        handled = false
+    }
+
+    mutating func feed(deltaX: CGFloat, deltaY: CGFloat, precise: Bool,
+                       phase: NSEvent.Phase, momentumPhase: NSEvent.Phase) -> Bool {
+        if phase.contains(.ended) || phase.contains(.cancelled) {
+            reset()
+            return false
+        }
+        guard precise, momentumPhase.isEmpty, !handled else { return false }
+        if phase.contains(.began) { distance = 0 }
+        guard abs(deltaY) >= abs(deltaX) * 1.5, abs(deltaY) > 0.2 else { return false }
+        guard deltaY < 0 else {
+            distance = 0
+            return false
+        }
+        distance += -deltaY
+        if distance >= 55 {
+            handled = true
+            return true
+        }
+        return false
+    }
+}
+
+private struct NotificationDismissSwipeMonitor: NSViewRepresentable {
+    let enabled: Bool
+    let onDismiss: () -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        context.coordinator.install(on: view)
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.onDismiss = onDismiss
+        context.coordinator.enabled = enabled
+    }
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        coordinator.remove()
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(enabled: enabled, onDismiss: onDismiss) }
+
+    @MainActor final class Coordinator {
+        var onDismiss: () -> Void
+        var enabled: Bool {
+            didSet { if !enabled { reset() } }
+        }
+        private var monitor: Any?
+        private var resetTask: Task<Void, Never>?
+        private var swipe = NotificationDismissSwipeAccumulator()
+
+        init(enabled: Bool, onDismiss: @escaping () -> Void) {
+            self.enabled = enabled
+            self.onDismiss = onDismiss
+        }
+
+        func install(on view: NSView) {
+            remove()
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self, weak view] event in
+                guard let self, self.enabled, let view, event.window === view.window,
+                      view.bounds.contains(view.convert(event.locationInWindow, from: nil)) else { return event }
+                if self.swipe.feed(deltaX: event.scrollingDeltaX, deltaY: event.scrollingDeltaY,
+                                   precise: event.hasPreciseScrollingDeltas,
+                                   phase: event.phase, momentumPhase: event.momentumPhase) {
+                    self.onDismiss()
+                }
+                self.resetTask?.cancel()
+                self.resetTask = Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(300))
+                    guard !Task.isCancelled else { return }
+                    self.reset()
+                }
+                return event
+            }
+        }
+
+        func remove() {
+            if let monitor { NSEvent.removeMonitor(monitor) }
+            monitor = nil
+            reset()
+        }
+
+        private func reset() {
+            resetTask?.cancel()
+            resetTask = nil
+            swipe.reset()
+        }
+    }
+}
+
 /// Reuses the original notch's content, black fill and animatable NotchShape in its existing NSPanel.
 struct NotificationNotchSurface: ViewModifier {
     @ObservedObject var presentation: NotificationPresentation
@@ -345,6 +447,7 @@ struct NotificationNotchSurface: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var active: Bool { presentation.current != nil }
+    private var hovered: Bool { presentation.hoveringSurfaces.contains(screenID) }
     private var expanded: Bool { active && presentation.surfaceExpanded }
     private var metrics: NotificationSurfaceMetrics {
         NotificationSurfaceMetrics(notification: presentation.current, screenWidth: screenFrame.width, topInset: topInset)
@@ -364,26 +467,47 @@ struct NotificationNotchSurface: ViewModifier {
         }
             .overlay(alignment: .top) {
                 if let item = presentation.current {
-                    NotchNotificationContent(notification: item, receivedAt: presentation.receivedAt)
-                        .frame(width: max(0, width - 40), alignment: .topLeading)
-                        .padding(.horizontal, 20)
-                        .padding(.top, topInset + 8)
-                        .padding(.bottom, 16)
-                        .opacity(presentation.contentVisible ? 1 : 0)
-                        .scaleEffect(presentation.contentVisible || reduceMotion ? 1 : 0.97, anchor: .top)
-                        .offset(y: presentation.contentVisible || reduceMotion ? 0 : -3)
-                        .allowsHitTesting(presentation.contentVisible)
-                        .onTapGesture { presentation.activateSource() }
-                        .help(item.appURL == nil ? "Use the original notification for actions" : "Open \(item.source)")
-                        .contextMenu {
-                            if item.appURL != nil {
-                                Button("Open \(item.source)") { presentation.activateSource() }
-                            }
-                            Button("Dismiss from notch") { presentation.dismiss() }
+                    HStack(alignment: .top, spacing: 6) {
+                        NotchNotificationContent(notification: item, receivedAt: presentation.receivedAt)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                            .onTapGesture { presentation.activateSource() }
+                            .help(item.appURL == nil ? "Use the original notification for actions" : "Open \(item.source)")
+                        Button { presentation.dismiss() } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(.white.opacity(0.88))
+                                .frame(width: 22, height: 22)
+                                .background(.white.opacity(0.16), in: Circle())
+                                .contentShape(Circle())
                         }
+                        .buttonStyle(.plain)
+                        .opacity(hovered ? 1 : 0)
+                        .allowsHitTesting(hovered && presentation.contentVisible)
+                        .accessibilityLabel("Dismiss notification")
+                        .accessibilityHidden(!hovered || !presentation.contentVisible)
+                    }
+                    .frame(width: max(0, width - 40), alignment: .topLeading)
+                    .padding(.horizontal, 20)
+                    .padding(.top, topInset + 8)
+                    .padding(.bottom, 16)
+                    .opacity(presentation.contentVisible ? 1 : 0)
+                    .scaleEffect(presentation.contentVisible || reduceMotion ? 1 : 0.97, anchor: .top)
+                    .offset(y: presentation.contentVisible || reduceMotion ? 0 : -3)
+                    .allowsHitTesting(presentation.contentVisible)
+                    .animation(.easeOut(duration: 0.14), value: hovered)
+                    .contextMenu {
+                        if item.appURL != nil {
+                            Button("Open \(item.source)") { presentation.activateSource() }
+                        }
+                        Button("Dismiss from notch") { presentation.dismiss() }
+                    }
                 }
             }
             .background(Color.black)
+            .background(NotificationDismissSwipeMonitor(enabled: active && presentation.contentVisible) {
+                presentation.dismiss()
+            })
             .clipShape(expanded ? NotchShape(topCornerRadius: 6, bottomCornerRadius: 26) : normalShape)
             .overlay(alignment: .top) {
                 Rectangle().fill(.black).frame(height: 1)

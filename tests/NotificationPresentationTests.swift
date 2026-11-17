@@ -82,6 +82,22 @@ struct NotificationPresentationTests {
         }
         let shortSize = NotificationSurfaceMetrics(notification: item("short"), screenWidth: 1440, topInset: 32).size
         check(shortSize.width == 360, "Short notifications use the compact width")
+
+        var swipe = NotificationDismissSwipeAccumulator()
+        check(!swipe.feed(deltaX: 25, deltaY: -10, precise: true, phase: .began, momentumPhase: []),
+              "Horizontal trackpad motion does not dismiss")
+        check(!swipe.feed(deltaX: 0, deltaY: 60, precise: true, phase: .changed, momentumPhase: []),
+              "Downward motion does not dismiss")
+        check(!swipe.feed(deltaX: 0, deltaY: -40, precise: false, phase: .changed, momentumPhase: []),
+              "Mouse wheel scrolling does not dismiss")
+        check(!swipe.feed(deltaX: 0, deltaY: -30, precise: true, phase: .changed, momentumPhase: []),
+              "A short upward scroll does not dismiss")
+        check(swipe.feed(deltaX: 0, deltaY: -30, precise: true, phase: .changed, momentumPhase: []),
+              "A deliberate upward trackpad swipe dismisses")
+        check(!swipe.feed(deltaX: 0, deltaY: -30, precise: true, phase: .changed, momentumPhase: []),
+              "One gesture dismisses at most once")
+        check(!swipe.feed(deltaX: 0, deltaY: 0, precise: true, phase: .ended, momentumPhase: []),
+              "Ending a gesture resets recognition")
         print("All notification presentation checks passed.")
     }
 }
