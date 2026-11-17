@@ -109,7 +109,7 @@ struct SettingsView: View {
         case "Notifications": return ("Notifications", "See new app banners emerge from the notch.", "bell.badge")
         case "Calendar": return ("Calendar", "Choose which events and reminders appear in the notch.", "calendar")
         case "HUD": return ("Volume, battery & system HUDs", "Choose how system changes appear around the notch.", "slider.horizontal.3")
-        case "Battery": return ("Battery notch widget", "Show your Mac’s battery beside the notch and choose its details.", "battery.100.bolt")
+        case "Battery": return ("Battery notch widget", "Show your Mac’s battery in Overview and choose its details.", "battery.100.bolt")
         case "Shelf": return ("File shelf", "Keep files handy and choose how to share them.", "square.stack.3d.up")
         case "Shortcuts": return ("Shortcuts", "Set keyboard shortcuts for quick actions.", "keyboard")
         case "Advanced": return ("Advanced", "Fine-tune colors, windows, and display behavior.", "gearshape.2")
@@ -385,7 +385,7 @@ struct GeneralSettings: View {
                 customBadge(text: "Beta")
             }
         } footer: {
-            Text("Swipe left or right across the open notch to move between Home, Overview, and Shelf when enabled. Swipe up to close it. When hover opening is off, swipe down to open it.")
+            Text("Swipe left or right across the open notch to move between Now Playing, Overview, and Shelf when enabled. Swipe up to close it. When hover opening is off, swipe down to open it.")
         }
     }
 
@@ -506,12 +506,12 @@ struct BatteryNotchSettings: View {
         Form {
             Section {
                 Defaults.Toggle(key: .showBatteryIndicator) {
-                    Text("Show battery beside the notch")
+                    Text("Show battery in Overview")
                 }
             } header: {
                 Text("Battery notch widget")
             } footer: {
-                Text("This small battery indicator sits beside the MacBook notch while Notchloom is open. Charging alerts have their own setting under Volume, battery & system HUDs.")
+                Text("This small battery indicator appears in Overview when the notch is open. Charging alerts have their own setting under Volume, battery & system HUDs.")
             }
             if showBatteryIndicator {
                 Section {
@@ -1392,7 +1392,7 @@ struct Appearance: View {
             Section {
                 Toggle("Always show tabs in the open notch", isOn: $coordinator.alwaysShowTabs)
                 Defaults.Toggle(key: .settingsIconInNotch) {
-                    Text("Show the Settings button in the notch")
+                    Text("Show the Settings button in Overview")
                 }
 
             } header: {
@@ -1419,7 +1419,7 @@ struct Appearance: View {
 
             Section {
                 Defaults.Toggle(key: .showMirror) {
-                    Text("Show camera mirror")
+                    Text("Show camera mirror in Overview")
                 }
                 .disabled(!checkVideoInput())
                 Picker("Mirror shape", selection: $mirrorShape) {
@@ -1430,9 +1430,9 @@ struct Appearance: View {
                     Text("Show the idle face animation")
                 }
             } header: {
-                Text("Mirror and idle view")
+                Text("Mirror and idle notch")
             } footer: {
-                Text("The mirror needs camera access. Notchloom uses the camera only while the mirror is open.")
+                Text("Open the mirror from Overview. Notchloom uses the camera only while the mirror is open.")
             }
 
             Section {

@@ -62,6 +62,7 @@ class WebcamManager: NSObject, ObservableObject {
     
     private override init() {
         super.init()
+        authorizationStatus = AVCaptureDevice.authorizationStatus(for: .video)
         NotificationCenter.default.addObserver(self, selector: #selector(deviceWasDisconnected), name: .AVCaptureDeviceWasDisconnected, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(deviceWasConnected), name: .AVCaptureDeviceWasConnected, object: nil)
         checkCameraAvailability()

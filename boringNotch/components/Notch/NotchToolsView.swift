@@ -1,23 +1,152 @@
+import Defaults
 import SwiftUI
 
-/// Overview shares Home's continuous black surface and content top edge.
+/// Overview contains the non-music tools on the same continuous notch surface.
 struct NotchToolsView: View {
+    @EnvironmentObject private var vm: BoringViewModel
     @ObservedObject private var focus = FocusTimerManager.shared
     @ObservedObject private var apps = QuickAppsManager.shared
     @ObservedObject private var audio = AudioOutputManager.shared
+    @ObservedObject private var webcam = WebcamManager.shared
+    @ObservedObject private var battery = BatteryStatusViewModel.shared
+    @Default(.showCalendar) private var showCalendar
+    @Default(.showMirror) private var showMirror
+    @Default(.showBatteryIndicator) private var showBattery
+    @Default(.settingsIconInNotch) private var showSettings
+    @State private var panel: OverviewPanel = .tools
+
+    private enum OverviewPanel: Equatable {
+        case tools
+        case calendar
+        case mirror
+    }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 0) {
-            focusSection.frame(width: 184, alignment: .topLeading)
-            sectionDivider
-            appsSection.frame(width: 182, alignment: .topLeading)
-            sectionDivider
-            audioSection.frame(width: 170, alignment: .topLeading)
+        VStack(spacing: 7) {
+            panelContent
+                .frame(height: 133, alignment: .top)
+                .frame(maxWidth: .infinity, alignment: .top)
+
+            HStack(spacing: 5) {
+                panelButton("Tools", icon: "square.grid.2x2.fill", for: .tools)
+                if showCalendar {
+                    panelButton("Calendar", icon: "calendar", for: .calendar)
+                }
+                if showMirror {
+                    panelButton("Mirror", icon: "web.camera", for: .mirror)
+                }
+
+                Spacer(minLength: 0)
+                if showBattery {
+                    BoringBatteryView(
+                        batteryWidth: 30,
+                        isCharging: battery.isCharging,
+                        isInLowPowerMode: battery.isInLowPowerMode,
+                        isPluggedIn: battery.isPluggedIn,
+                        levelBattery: battery.levelBattery,
+                        maxCapacity: battery.maxCapacity,
+                        timeToFullCharge: battery.timeToFullCharge,
+                        isForNotification: false
+                    )
+                    .frame(width: 30, height: 28)
+                    .help("Battery in Overview")
+                }
+                if showSettings {
+                    Button {
+                        SettingsWindowController.shared.showWindow()
+                    } label: {
+                        Image(systemName: "gearshape")
+                            .frame(width: 28, height: 28)
+                            .contentShape(Circle())
+                    }
+                    .help("Notchloom Settings")
+                }
+            }
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(.white.opacity(0.78))
+            .frame(height: 29)
+            .padding(.horizontal, 10)
         }
-        .frame(height: 133, alignment: .top)
-        .padding(.top, 5)
+        .padding(.top, 4)
         .frame(maxWidth: .infinity, alignment: .top)
         .buttonStyle(.plain)
+        .onChange(of: showCalendar) { _, enabled in
+            if !enabled && panel == .calendar { panel = .tools }
+        }
+        .onChange(of: showMirror) { _, enabled in
+            if !enabled && panel == .mirror {
+                stopMirror()
+                panel = .tools
+            }
+        }
+        .onChange(of: webcam.authorizationStatus) { _, status in
+            if status == .authorized && panel == .mirror && webcam.cameraAvailable && !webcam.isSessionRunning {
+                vm.toggleCameraPreview()
+            }
+        }
+        .onChange(of: webcam.cameraAvailable) { _, available in
+            if available && panel == .mirror && webcam.authorizationStatus == .authorized && !webcam.isSessionRunning {
+                vm.toggleCameraPreview()
+            }
+        }
+        .onDisappear { stopMirror() }
+    }
+
+    @ViewBuilder
+    private var panelContent: some View {
+        switch panel {
+        case .tools:
+            HStack(alignment: .top, spacing: 0) {
+                focusSection.frame(width: 184, alignment: .topLeading)
+                sectionDivider
+                appsSection.frame(width: 182, alignment: .topLeading)
+                sectionDivider
+                audioSection.frame(width: 170, alignment: .topLeading)
+            }
+            .padding(.top, 5)
+        case .calendar:
+            CalendarView()
+                .frame(width: 570, height: 120)
+                .onHover { vm.isHoveringCalendar = $0 }
+        case .mirror:
+            HStack(spacing: 16) {
+                CameraPreviewView(webcamManager: webcam)
+                    .frame(width: 120, height: 120)
+                VStack(alignment: .leading, spacing: 5) {
+                    Label("Mirror", systemImage: "web.camera")
+                        .font(.system(size: 15, weight: .semibold))
+                    Text(webcam.isSessionRunning
+                         ? "Select the preview to turn off the camera."
+                         : "Select the preview to turn on the camera.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 22)
+        }
+    }
+
+    private func panelButton(_ title: String, icon: String, for target: OverviewPanel) -> some View {
+        Button {
+            if panel == .mirror && target != .mirror { stopMirror() }
+            if target == .mirror && panel != .mirror { vm.toggleCameraPreview() }
+            withAnimation(.snappy(duration: 0.25, extraBounce: 0)) { panel = target }
+        } label: {
+            Label(title, systemImage: icon)
+                .padding(.horizontal, 9)
+                .frame(height: 27)
+                .background(panel == target ? .white.opacity(0.16) : .clear, in: Capsule())
+                .contentShape(Capsule())
+        }
+        .accessibilityAddTraits(panel == target ? .isSelected : [])
+    }
+
+    private func stopMirror() {
+        if vm.isCameraExpanded || webcam.isSessionRunning {
+            webcam.stopSession()
+            vm.isCameraExpanded = false
+        }
     }
 
     private var sectionDivider: some View {

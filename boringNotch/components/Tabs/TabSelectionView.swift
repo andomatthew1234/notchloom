@@ -16,7 +16,7 @@ struct TabModel: Identifiable {
 }
 
 let tabs = [
-    TabModel(label: "Home", icon: "house.fill", view: .home),
+    TabModel(label: "Now Playing", icon: "play.circle.fill", view: .home),
     TabModel(label: "Overview", icon: "square.grid.2x2.fill", view: .tools),
     TabModel(label: "Shelf", icon: "tray.fill", view: .shelf)
 ]
@@ -35,12 +35,17 @@ struct TabSelectionView: View {
                             coordinator.currentView = tab.view
                         }
                     } label: {
-                        Label(tab.label, systemImage: tab.icon)
-                            .labelStyle(.titleAndIcon)
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(coordinator.currentView == tab.view ? .white : .white.opacity(0.68))
-                            .frame(minWidth: 112, minHeight: 29)
-                            .contentShape(Capsule())
+                        VStack(spacing: 0) {
+                            Image(systemName: tab.icon)
+                                .font(.system(size: 10, weight: .semibold))
+                            Text(tab.label)
+                                .font(.system(size: 10, weight: .semibold))
+                        }
+                        .foregroundStyle(coordinator.currentView == tab.view ? .white : .white.opacity(0.68))
+                        .padding(.horizontal, 3)
+                        .frame(height: 27)
+                        .lineLimit(1)
+                        .contentShape(Capsule())
                     }
                     .buttonStyle(.plain)
                     .background {
@@ -54,7 +59,7 @@ struct TabSelectionView: View {
                 }
             }
         }
-        .padding(3)
+        .padding(2)
         .background(.white.opacity(0.07), in: Capsule())
         .fixedSize(horizontal: true, vertical: false)
         .accessibilityElement(children: .contain)

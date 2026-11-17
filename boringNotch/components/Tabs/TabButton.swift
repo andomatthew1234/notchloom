@@ -24,7 +24,7 @@ struct TabButton: View {
 }
 
 #Preview {
-    TabButton(label: "Home", icon: "tray.fill", selected: true) {
+    TabButton(label: "Now Playing", icon: "play.circle.fill", selected: true) {
         print("Tapped")
     }
 }

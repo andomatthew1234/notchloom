@@ -2,7 +2,7 @@
 //  BoringHeader.swift
 //  boringNotch
 //
-//  Created by Harsh Vardhan  Goswami  on 04/08/24.
+//  Created by Harsh Vardhan Goswami on 04/08/24.
 //
 
 import Defaults
@@ -10,114 +10,73 @@ import SwiftUI
 
 struct BoringHeader: View {
     @EnvironmentObject var vm: BoringViewModel
-    @ObservedObject var batteryModel = BatteryStatusViewModel.shared
     @ObservedObject var coordinator = BoringViewCoordinator.shared
     @StateObject var tvm = ShelfStateViewModel.shared
+
     private var showsTabs: Bool {
         coordinator.alwaysShowTabs || (!tvm.isEmpty && Defaults[.boringShelf])
             || coordinator.currentView == .tools || coordinator.currentView == .shelf
     }
 
+    private var headerHeight: CGFloat {
+        max(32, vm.effectiveClosedNotchHeight)
+    }
+
+    private var contentWidth: CGFloat {
+        let cornerInset = Defaults[.cornerRadiusScaling]
+            ? cornerRadiusInsets.opened.top : cornerRadiusInsets.opened.bottom
+        return max(vm.closedNotchSize.width, vm.notchSize.width - 2 * (cornerInset + 12))
+    }
+
     var body: some View {
-        VStack(spacing: 2) {
+        let sideWidth = max(0, (contentWidth - vm.closedNotchSize.width) / 2)
+
+        HStack(spacing: 0) {
             HStack(spacing: 0) {
                 Spacer(minLength: 0)
-                if vm.notchState == .open {
-                    Rectangle()
-                        .fill(NSScreen.screen(withUUID: coordinator.selectedScreenUUID)?.safeAreaInsets.top ?? 0 > 0 ? .black : .clear)
-                        .frame(width: vm.closedNotchSize.width)
-                        .mask { NotchShape() }
+                if showsTabs {
+                    TabSelectionView()
+                } else {
+                    Button {
+                        withAnimation(.smooth) { coordinator.currentView = .tools }
+                    } label: {
+                        Image(systemName: "square.grid.2x2")
+                            .foregroundStyle(.white)
+                            .frame(width: 30, height: 30)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Open Overview")
                 }
-                utilityButtons
-                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            .frame(height: max(24, vm.effectiveClosedNotchHeight))
+            .padding(.trailing, 6)
+            .frame(width: sideWidth, height: headerHeight)
 
-            if vm.notchState == .open && showsTabs {
-                TabSelectionView()
-                    .frame(maxWidth: .infinity)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            }
+            Rectangle()
+                .fill(NSScreen.screen(withUUID: coordinator.selectedScreenUUID)?.safeAreaInsets.top ?? 0 > 0 ? .black : .clear)
+                .frame(width: vm.closedNotchSize.width, height: headerHeight)
+                .mask { NotchShape() }
+
+            utilityHUD
+                .frame(width: sideWidth, height: headerHeight, alignment: .trailing)
         }
+        .frame(width: contentWidth, height: headerHeight)
+        // NotchLayout is leading-aligned to the wider player content. Bring the
+        // camera spacer back to the screen center while keeping tabs beside it.
+        .offset(x: -vm.closedNotchSize.width / 2)
         .foregroundColor(.gray)
         .environmentObject(vm)
     }
 
-    private var utilityButtons: some View {
-        HStack(spacing: 4) {
-                if vm.notchState == .open {
-                    if isHUDType(coordinator.sneakPeek.type) && coordinator.sneakPeek.show && Defaults[.showOpenNotchHUD] {
-                        OpenNotchHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon)
-                            .transition(.scale(scale: 0.8).combined(with: .opacity))
-                    } else {
-                        if !showsTabs {
-                            Button {
-                                withAnimation(.smooth) { coordinator.currentView = .tools }
-                            } label: {
-                                Image(systemName: "square.grid.2x2")
-                                    .foregroundColor(.white)
-                                    .frame(width: 30, height: 30)
-                            }
-                            .buttonStyle(.plain)
-                            .help("Open Overview")
-                        }
-                        if Defaults[.showMirror] {
-                            Button(action: {
-                                vm.toggleCameraPreview()
-                            }) {
-                                Capsule()
-                                    .fill(.black)
-                                    .frame(width: 30, height: 30)
-                                    .overlay {
-                                        Image(systemName: "web.camera")
-                                            .foregroundColor(.white)
-                                            .padding()
-                                            .imageScale(.medium)
-                                    }
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        }
-                        if Defaults[.settingsIconInNotch] {
-                            Button(action: {
-                                DispatchQueue.main.async {
-                                    SettingsWindowController.shared.showWindow()
-                                }
-                                
-                            }) {
-                                Capsule()
-                                    .fill(.black)
-                                    .frame(width: 30, height: 30)
-                                    .overlay {
-                                        Image(systemName: "gear")
-                                            .foregroundColor(.white)
-                                            .padding()
-                                            .imageScale(.medium)
-                                    }
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        }
-                        if Defaults[.showBatteryIndicator] {
-                            BoringBatteryView(
-                                batteryWidth: 30,
-                                isCharging: batteryModel.isCharging,
-                                isInLowPowerMode: batteryModel.isInLowPowerMode,
-                                isPluggedIn: batteryModel.isPluggedIn,
-                                levelBattery: batteryModel.levelBattery,
-                                maxCapacity: batteryModel.maxCapacity,
-                                timeToFullCharge: batteryModel.timeToFullCharge,
-                                isForNotification: false
-                            )
-                        }
-                    }
-                }
+    @ViewBuilder
+    private var utilityHUD: some View {
+        if isHUDType(coordinator.sneakPeek.type) && coordinator.sneakPeek.show && Defaults[.showOpenNotchHUD] {
+            OpenNotchHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon)
+                .padding(.trailing, 8)
+                .transition(.scale(scale: 0.8).combined(with: .opacity))
         }
-        .font(.system(.headline, design: .rounded))
-        .opacity(vm.notchState == .closed ? 0 : 1)
-        .blur(radius: vm.notchState == .closed ? 20 : 0)
-        .zIndex(2)
     }
 
-    func isHUDType(_ type: SneakContentType) -> Bool {
+    private func isHUDType(_ type: SneakContentType) -> Bool {
         switch type {
         case .volume, .brightness, .backlight, .mic:
             return true
