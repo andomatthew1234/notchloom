@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct ConvertTargetView: View {
     @EnvironmentObject private var vm: BoringViewModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var converter = ConversionManager.shared
     @State private var targeted = false
 
@@ -28,13 +29,14 @@ struct ConvertTargetView: View {
                 .strokeBorder(targeted ? .cyan.opacity(0.8) : .white.opacity(0.11), lineWidth: 1.5)
         }
         .scaleEffect(targeted ? 1.035 : 1)
-        .animation(.spring(response: 0.32, dampingFraction: 0.82), value: targeted)
+        .animation(reduceMotion ? .easeOut(duration: 0.15) :
+            .spring(response: 0.32, dampingFraction: 0.82), value: targeted)
         .onChange(of: targeted) { _, value in vm.convertDropTargeting = value }
         .onDisappear { vm.convertDropTargeting = false }
         .onDrop(of: [.fileURL], isTargeted: $targeted) { providers in
             guard !providers.isEmpty else { return false }
             vm.dropEvent = true
-            converter.prepare(providers: providers)
+            converter.prepare(providers: providers, screenID: vm.screenUUID)
             return true
         }
         .accessibilityLabel("Convert files")
@@ -43,15 +45,25 @@ struct ConvertTargetView: View {
 }
 
 struct ConvertPanelView: View {
+    @EnvironmentObject private var vm: BoringViewModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var converter = ConversionManager.shared
     @ObservedObject private var preferences = ConversionPreferences.shared
     @State private var choosingFormat = false
     @State private var showingSettings = false
     @State private var search = ""
     @State private var showDetails = false
+    @State private var resultAnimationTrigger = 0
+    @FocusState private var searchFocused: Bool
 
     private var selected: ConversionFormat? { converter.selectedFormat }
     private var first: ConversionInput? { converter.categoryInputs.first }
+    private var panelAnimation: Animation {
+        reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.36, dampingFraction: 0.86)
+    }
+    private var inputFormatName: String {
+        first?.type.preferredFilenameExtension?.uppercased() ?? first?.displayType ?? "FILE"
+    }
     private var filteredFormats: [ConversionFormat] {
         converter.formats.filter {
             search.isEmpty || $0.name.localizedCaseInsensitiveContains(search)
@@ -60,24 +72,87 @@ struct ConvertPanelView: View {
     }
 
     var body: some View {
-        Group {
-            switch converter.stage {
-            case .idle: EmptyView()
-            case .preparing: loadingView
-            case .setup:
-                if choosingFormat { formatPicker }
-                else if showingSettings { settingsView }
-                else { setupView }
-            case .running: progressView
-            case .finished: resultView
+        VStack(spacing: 0) {
+            header
+            Rectangle().fill(.white.opacity(0.08)).frame(height: 1).padding(.top, 10).padding(.bottom, 14)
+            Group {
+                switch converter.stage {
+                case .idle: EmptyView()
+                case .preparing: loadingView
+                case .setup:
+                    if choosingFormat { formatPicker }
+                    else if showingSettings { settingsView }
+                    else { setupView }
+                case .running: progressView
+                case .finished: resultView
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .id("\(converter.stage)-\(choosingFormat)-\(showingSettings)")
+            .transition(reduceMotion ? .opacity : .opacity.combined(with: .offset(y: 9)))
+        }
+        .padding(.horizontal, 22)
+        .padding(.top, 11)
+        .padding(.bottom, 15)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(ScrollGestureExclusionArea())
+        .onHover(perform: converter.hoverChanged)
+        .animation(panelAnimation, value: converter.stage)
+        .animation(panelAnimation, value: choosingFormat)
+        .animation(panelAnimation, value: showingSettings)
+        .onChange(of: choosingFormat) { _, isChoosing in
+            if isChoosing {
+                if let window = vm.hostWindow as? BoringNotchSkyLightWindow {
+                    window.allowsConverterKeyboardFocus = true
+                    window.makeKey()
+                }
+                Task { @MainActor in searchFocused = true }
+            } else {
+                releaseKeyboardFocus()
             }
         }
-        .padding(.horizontal, 24)
-        .padding(.top, 6)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .onHover(perform: converter.hoverChanged)
-        .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: .top)))
-        .animation(.smooth(duration: 0.26), value: converter.stage)
+        .onChange(of: converter.stage) { _, stage in
+            if stage != .setup { releaseKeyboardFocus() }
+        }
+        .onDisappear { releaseKeyboardFocus() }
+    }
+
+    private func releaseKeyboardFocus() {
+        searchFocused = false
+        if let window = vm.hostWindow as? BoringNotchSkyLightWindow {
+            window.resignKey()
+            window.allowsConverterKeyboardFocus = false
+        }
+    }
+
+    private var header: some View {
+        HStack(spacing: 11) {
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(.cyan)
+                .frame(width: 34, height: 34)
+                .background(.cyan.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(converter.stage == .running ? "Converting" :
+                     converter.categoryInputs.count > 1 ? "Convert Files" : "Convert File")
+                    .font(.system(size: 17, weight: .semibold))
+                if converter.stage == .running || converter.jobs.count > 1 {
+                    Text("\(converter.jobs.count > 0 ? converter.jobs.count : converter.categoryInputs.count) files")
+                        .font(.system(size: 11)).foregroundStyle(.white.opacity(0.48))
+                }
+            }
+            Spacer()
+            Button { converter.close() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.68))
+                    .frame(width: 30, height: 30)
+                    .background(.white.opacity(0.08), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .help("Close Convert")
+            .accessibilityLabel("Close Convert")
+        }
     }
 
     private var loadingView: some View {
@@ -85,291 +160,448 @@ struct ConvertPanelView: View {
             ProgressView().controlSize(.small)
             Text("Checking files…").font(.system(size: 14, weight: .medium))
             Spacer()
-            Button("Cancel") { converter.close() }
         }
-        .padding(.top, 42)
+        .padding(.top, 50)
     }
 
     private var setupView: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                Image(nsImage: first.map { NSWorkspace.shared.icon(forFile: $0.url.path) } ?? NSImage())
-                    .resizable().scaledToFit().frame(width: 34, height: 34)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(converter.categoryInputs.count == 1 ? first?.name ?? "Convert file" :
-                            "\(converter.categoryInputs.count) files to convert")
-                        .font(.system(size: 15, weight: .semibold))
-                        .lineLimit(1).truncationMode(.middle)
-                    Text(first?.isDirectory == true ? "Folder · ZIP archive available" :
-                            "\(first?.displayType ?? "File") · \(ByteCountFormatter.string(fromByteCount: converter.totalSize, countStyle: .file))")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.white.opacity(0.57))
-                }
-                Spacer(minLength: 8)
-                if converter.availableCategories.count > 1 {
-                    Menu {
-                        ForEach(converter.availableCategories) { category in
-                            Button(category.rawValue) { converter.selectCategory(category) }
-                        }
-                    } label: {
-                        Label(converter.selectedCategory.rawValue, systemImage: "square.stack")
-                    }
-                    .font(.system(size: 11))
-                }
-                Button { converter.close() } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 17))
-                        .foregroundStyle(.white.opacity(0.5))
-                }
-                .help("Cancel")
-            }
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: 10) {
+                    fileCard
 
-            HStack(spacing: 10) {
-                Text("Convert to")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.65))
-                Button {
-                    search = ""
-                    withAnimation(.snappy(duration: 0.22)) { choosingFormat = true }
-                } label: {
-                    HStack {
-                        Text(selected?.name ?? "No compatible formats")
-                        Spacer()
-                        Image(systemName: "chevron.down")
+                    HStack(spacing: 12) {
+                        formatChip(inputFormatName, caption: "FROM")
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.cyan)
+                            .symbolEffect(.pulse, value: converter.selectedFormatID)
+                            .frame(maxWidth: .infinity)
+                        formatChip(selected?.name ?? "Choose format", caption: "TO")
                     }
-                    .font(.system(size: 12, weight: .semibold))
                     .padding(.horizontal, 10)
-                    .frame(height: 30)
-                    .background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                    .frame(height: 51)
+                    .background(.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 12))
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("OUTPUT FORMAT")
+                            .font(.system(size: 10, weight: .semibold))
+                            .tracking(0.8).foregroundStyle(.white.opacity(0.47))
+                        Button {
+                            search = ""
+                            withAnimation(panelAnimation) { choosingFormat = true }
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: selected.map { icon(for: $0.category) } ?? "questionmark.circle")
+                                    .font(.system(size: 17)).foregroundStyle(.cyan)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(selected?.name ?? "No compatible formats")
+                                        .font(.system(size: 13, weight: .semibold))
+                                    if let selected {
+                                        Text(selected.detail).font(.system(size: 11))
+                                            .foregroundStyle(.white.opacity(0.53)).lineLimit(1)
+                                    }
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(.white.opacity(0.55))
+                            }
+                            .padding(.horizontal, 12).frame(height: 48)
+                            .background(.white.opacity(0.075), in: RoundedRectangle(cornerRadius: 11))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(converter.formats.isEmpty)
+                        .accessibilityLabel("Convert to \(selected?.name ?? "No compatible formats")")
+                    }
+                    if let note = converter.message {
+                        Text(note).font(.system(size: 11)).foregroundStyle(.orange)
+                            .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                    }
                 }
-                .disabled(converter.formats.isEmpty)
-                Button {
-                    withAnimation(.snappy(duration: 0.22)) { showingSettings = true }
-                } label: {
-                    Image(systemName: "slider.horizontal.3")
-                        .frame(width: 30, height: 30)
-                        .background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
-                }
-                .help("Conversion settings")
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            if let note = converter.message {
-                Text(note).font(.system(size: 10)).foregroundStyle(.orange).lineLimit(2)
-            } else if let selected {
-                Text(selected.detail + (converter.selectedCategory == .document || converter.selectedCategory == .archive
-                                        ? "" : " · " + converter.preset.rawValue))
-                    .font(.system(size: 10)).foregroundStyle(.white.opacity(0.52)).lineLimit(1)
-            }
-            HStack {
-                Spacer()
+            .scrollIndicators(.automatic)
+            HStack(spacing: 10) {
                 Button("Cancel") { converter.close() }
-                    .foregroundStyle(.white.opacity(0.7))
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.white.opacity(0.65))
+                    .frame(minWidth: 68, minHeight: 34)
+                Spacer()
                 Button {
-                    converter.start()
+                    withAnimation(panelAnimation) { showingSettings = true }
                 } label: {
+                    Label("Advanced Settings", systemImage: "slider.horizontal.3")
+                        .frame(minHeight: 34).padding(.horizontal, 10)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white.opacity(0.82))
+                Button { converter.start() } label: {
                     Label(converter.categoryInputs.count > 1 ? "Convert all" : "Convert", systemImage: "arrow.triangle.2.circlepath")
                         .font(.system(size: 12, weight: .semibold))
-                        .padding(.horizontal, 13)
-                        .frame(height: 28)
-                        .background(.cyan, in: Capsule())
-                        .foregroundStyle(.black)
+                        .padding(.horizontal, 17).frame(height: 36)
+                        .background(.cyan, in: Capsule()).foregroundStyle(.black)
                 }
+                .buttonStyle(.plain)
                 .disabled(selected == nil)
             }
         }
     }
 
+    private var fileCard: some View {
+        HStack(spacing: 13) {
+            Image(nsImage: first.map { NSWorkspace.shared.icon(forFile: $0.url.path) } ?? NSImage())
+                .resizable().scaledToFit().frame(width: 49, height: 49)
+                .frame(width: 58, height: 58)
+                .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 11))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(converter.categoryInputs.count == 1 ? first?.name ?? "File" :
+                     "\(converter.categoryInputs.count) files to convert")
+                    .font(.system(size: 14, weight: .semibold))
+                    .lineLimit(1).truncationMode(.middle)
+                Text(first?.isDirectory == true ? "Folder" :
+                     "\(first?.displayType ?? "File") · \(ByteCountFormatter.string(fromByteCount: converter.totalSize, countStyle: .file))")
+                    .font(.system(size: 11)).foregroundStyle(.white.opacity(0.55))
+            }
+            Spacer(minLength: 6)
+            if converter.availableCategories.count > 1 {
+                Menu {
+                    ForEach(converter.availableCategories) { category in
+                        Button(category.rawValue) { converter.selectCategory(category) }
+                    }
+                } label: {
+                    Text(converter.selectedCategory.rawValue)
+                        .font(.system(size: 11, weight: .medium))
+                }
+            }
+        }
+        .padding(11)
+        .background(.white.opacity(0.075), in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(.white.opacity(0.075)))
+    }
+
+    private func formatChip(_ text: String, caption: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(caption).font(.system(size: 9, weight: .semibold))
+                .tracking(0.6).foregroundStyle(.white.opacity(0.43))
+            Text(text).font(.system(size: 12, weight: .semibold))
+                .lineLimit(1).truncationMode(.tail)
+        }
+        .frame(width: 155, alignment: .leading)
+    }
+
+    private func icon(for category: ConversionCategory) -> String {
+        switch category {
+        case .image: "photo"
+        case .video: "film"
+        case .audio: "waveform"
+        case .document: "doc.text"
+        case .ebook: "book.closed"
+        case .archive: "archivebox"
+        }
+    }
+
     private var formatPicker: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 11) {
             HStack {
-                Text("Choose a format").font(.system(size: 14, weight: .semibold))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Choose output format").font(.system(size: 15, weight: .semibold))
+                    Text("Only formats available for this file are shown")
+                        .font(.system(size: 11)).foregroundStyle(.white.opacity(0.53))
+                }
                 Spacer()
-                Button("Back") { withAnimation(.snappy(duration: 0.22)) { choosingFormat = false } }
+                Button("Done") { withAnimation(panelAnimation) { choosingFormat = false } }
+                    .buttonStyle(.plain).foregroundStyle(.cyan)
             }
             TextField("Search formats", text: $search)
                 .textFieldStyle(.roundedBorder)
-            ScrollView {
-                LazyVStack(spacing: 4) {
-                    ForEach(filteredFormats) { format in
-                        Button {
-                            converter.selectedFormatID = format.id
-                            withAnimation(.snappy(duration: 0.22)) { choosingFormat = false }
-                        } label: {
-                            HStack {
-                                Text(format.name).font(.system(size: 12, weight: .semibold))
-                                Spacer()
-                                Text(format.detail).font(.system(size: 10))
-                                    .foregroundStyle(.white.opacity(0.5))
+                .focused($searchFocused)
+                .accessibilityLabel("Search conversion formats")
+                .onSubmit {
+                    if let format = filteredFormats.first {
+                        converter.selectedFormatID = format.id
+                        withAnimation(panelAnimation) { choosingFormat = false }
+                    }
+                }
+                .onKeyPress(.escape) {
+                    withAnimation(panelAnimation) { choosingFormat = false }
+                    return .handled
+                }
+            ScrollView(.vertical) {
+                LazyVStack(alignment: .leading, spacing: 7) {
+                    ForEach(ConversionCategory.allCases) { category in
+                        let options = filteredFormats.filter { $0.category == category }
+                        if !options.isEmpty {
+                            Text(category.rawValue.uppercased())
+                                .font(.system(size: 10, weight: .semibold))
+                                .tracking(0.8).foregroundStyle(.white.opacity(0.48))
+                                .padding(.top, 4)
+                            ForEach(options) { format in
+                                Button {
+                                    converter.selectedFormatID = format.id
+                                    withAnimation(panelAnimation) { choosingFormat = false }
+                                } label: {
+                                    HStack(spacing: 10) {
+                                        Image(systemName: icon(for: category))
+                                            .font(.system(size: 17)).foregroundStyle(.cyan)
+                                            .frame(width: 27)
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            HStack(spacing: 6) {
+                                                Text(format.name).font(.system(size: 13, weight: .semibold))
+                                                if format.id == converter.formats.first?.id {
+                                                    Text("Suggested")
+                                                        .font(.system(size: 9, weight: .medium))
+                                                        .foregroundStyle(.cyan.opacity(0.85))
+                                                }
+                                            }
+                                            Text(format.detail).font(.system(size: 11))
+                                                .foregroundStyle(.white.opacity(0.52)).lineLimit(1)
+                                        }
+                                        Spacer()
+                                        if format.id == converter.selectedFormatID {
+                                            Image(systemName: "checkmark.circle.fill")
+                                                .foregroundStyle(.cyan)
+                                        }
+                                    }
+                                    .padding(.horizontal, 12).frame(height: 48)
+                                    .background(.white.opacity(format.id == converter.selectedFormatID ? 0.13 : 0.055),
+                                                in: RoundedRectangle(cornerRadius: 10))
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("\(format.name), \(format.detail)")
                             }
-                            .padding(.horizontal, 9).frame(height: 26)
-                            .background(.white.opacity(format.id == converter.selectedFormatID ? 0.13 : 0.05),
-                                        in: RoundedRectangle(cornerRadius: 7))
                         }
                     }
                 }
+                .padding(.bottom, 4)
             }
-            .frame(maxHeight: 86)
+            .scrollIndicators(.visible)
+            .frame(maxHeight: .infinity)
+            .onKeyPress(.escape) {
+                withAnimation(panelAnimation) { choosingFormat = false }
+                return .handled
+            }
         }
     }
 
     private var settingsView: some View {
-        VStack(alignment: .leading, spacing: 9) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("Conversion settings").font(.system(size: 14, weight: .semibold))
+                Text("Advanced Settings").font(.system(size: 15, weight: .semibold))
                 Spacer()
-                Button("Done") { withAnimation(.snappy(duration: 0.22)) { showingSettings = false } }
+                Button("Done") { withAnimation(panelAnimation) { showingSettings = false } }
+                    .buttonStyle(.plain).foregroundStyle(.cyan)
             }
             ScrollView {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("Save to").foregroundStyle(.white.opacity(0.62))
-                        Spacer()
-                        Menu {
-                            Button("Beside original") { preferences.useOriginalFolder() }
-                            Button("Choose folder…") { preferences.chooseFolder() }
-                        } label: {
-                            Text(preferences.folderName).lineLimit(1)
-                        }
-                    }
-                    HStack {
-                        Text("Filename").foregroundStyle(.white.opacity(0.62))
-                        Spacer()
-                        Picker("Filename", selection: $preferences.naming) {
-                            ForEach(ConversionPreferences.Naming.allCases) { choice in
-                                Text(choice.rawValue).tag(choice)
-                            }
-                        }
-                        .labelsHidden().frame(width: 160)
-                    }
-                    HStack {
-                        Text("If name exists").foregroundStyle(.white.opacity(0.62))
-                        Spacer()
-                        Picker("If name exists", selection: $preferences.collision) {
-                            ForEach(ConversionCollision.allCases) { choice in
-                                Text(choice.rawValue).tag(choice)
-                            }
-                        }
-                        .labelsHidden().frame(width: 160)
-                    }
+                VStack(alignment: .leading, spacing: 9) {
                     if converter.selectedCategory == .image || converter.selectedCategory == .video ||
                         converter.selectedCategory == .audio {
-                        HStack {
-                            Text("Quality").foregroundStyle(.white.opacity(0.62))
-                            Spacer()
+                        settingRow("Quality") {
                             Picker("Quality", selection: $converter.preset) {
                                 ForEach(ConversionPreset.allCases) { choice in
                                     Text(choice.rawValue).tag(choice)
                                 }
                             }
-                            .labelsHidden().frame(width: 160)
+                            .labelsHidden().frame(width: 190)
                         }
                     }
-                    Toggle("Preserve metadata", isOn: $preferences.preserveMetadata)
-                        .toggleStyle(.switch)
+                    settingRow("Save to") {
+                        Menu {
+                            Button("Beside original") { preferences.useOriginalFolder() }
+                            Button("Choose folder…") { preferences.chooseFolder() }
+                        } label: {
+                            Text(preferences.folderName).lineLimit(1)
+                                .frame(maxWidth: 190, alignment: .trailing)
+                            Image(systemName: "chevron.down").font(.system(size: 10))
+                        }
+                    }
+                    settingRow("Filename") {
+                        Picker("Filename", selection: $preferences.naming) {
+                            ForEach(ConversionPreferences.Naming.allCases) { choice in
+                                Text(choice.rawValue).tag(choice)
+                            }
+                        }
+                        .labelsHidden().frame(width: 190)
+                    }
+                    settingRow("If name exists") {
+                        Picker("If name exists", selection: $preferences.collision) {
+                            ForEach(ConversionCollision.allCases) { choice in
+                                Text(choice.rawValue).tag(choice)
+                            }
+                        }
+                        .labelsHidden().frame(width: 190)
+                    }
+                    settingRow("Keep metadata") {
+                        Toggle("Keep metadata", isOn: $preferences.preserveMetadata)
+                            .labelsHidden().toggleStyle(.switch)
+                    }
+                    Text("The original is never replaced. Some formats cannot retain every type of metadata or visual detail.")
+                        .font(.system(size: 11)).foregroundStyle(.white.opacity(0.47))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 3)
                 }
             }
-            .scrollIndicators(.hidden)
+            .scrollIndicators(.visible)
         }
-        .font(.system(size: 11))
-        .frame(maxWidth: 430)
+    }
+
+    private func settingRow<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        HStack(spacing: 10) {
+            Text(title).font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white.opacity(0.75))
+            Spacer(minLength: 10)
+            content()
+        }
+        .frame(minHeight: 38)
+        .padding(.horizontal, 12)
+        .background(.white.opacity(0.065), in: RoundedRectangle(cornerRadius: 10))
     }
 
     private var progressView: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: "arrow.triangle.2.circlepath")
-                    .font(.system(size: 21)).foregroundStyle(.cyan)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Converting \(converter.currentJob?.input.name ?? "files")")
-                        .font(.system(size: 15, weight: .semibold)).lineLimit(1)
-                    Text(converter.currentJob?.format.name ?? "")
-                        .font(.system(size: 11)).foregroundStyle(.white.opacity(0.56))
-                }
-                Spacer()
-                Text("\(converter.completedCount + converter.failedCount + 1) of \(converter.jobs.count)")
-                    .font(.system(size: 11)).foregroundStyle(.white.opacity(0.55))
-            }
-            if let value = converter.overallProgress {
-                ProgressView(value: value).tint(.cyan)
-            } else {
-                ProgressView().tint(.cyan)
-            }
-            TimelineView(.periodic(from: .now, by: 1)) { context in
-                let elapsed = converter.currentJob?.startedAt.map { context.date.timeIntervalSince($0) } ?? 0
-                Text("\(converter.overallProgress.map { "\(Int($0 * 100))% · " } ?? "")\(duration(elapsed)) elapsed")
-                    .font(.system(size: 11)).foregroundStyle(.white.opacity(0.6))
-            }
-            HStack {
-                if let remaining = converter.currentJob?.progress?.remaining {
-                    Text("About \(duration(remaining)) remaining")
+        VStack(alignment: .leading, spacing: 15) {
+            HStack(spacing: 12) {
+                Image(nsImage: converter.currentJob.map { NSWorkspace.shared.icon(forFile: $0.input.url.path) } ?? NSImage())
+                    .resizable().scaledToFit().frame(width: 45, height: 45)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(converter.currentJob?.input.name ?? "Preparing next file")
+                        .font(.system(size: 14, weight: .semibold))
+                        .lineLimit(1).truncationMode(.middle)
+                    Text("To \(converter.currentJob?.format.name ?? "output")")
                         .font(.system(size: 11)).foregroundStyle(.white.opacity(0.54))
                 }
                 Spacer()
+                Text("\(min(converter.jobs.count, converter.completedCount + converter.failedCount + converter.cancelledCount + 1)) / \(converter.jobs.count)")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.55))
+            }
+            .padding(12)
+            .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 13))
+
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("Conversion progress")
+                        .font(.system(size: 12, weight: .medium))
+                    Spacer()
+                    if let value = converter.overallProgress {
+                        Text("\(Int(value * 100))%")
+                            .font(.system(size: 13, weight: .semibold)).foregroundStyle(.cyan)
+                    }
+                }
+                if let value = converter.overallProgress {
+                    ProgressView(value: value).tint(.cyan)
+                } else {
+                    ProgressView().tint(.cyan)
+                }
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    let elapsed = converter.currentJob?.startedAt.map { context.date.timeIntervalSince($0) } ?? 0
+                    HStack {
+                        Text("\(duration(elapsed)) elapsed")
+                        Spacer()
+                        if let remaining = converter.currentJob?.progress?.remaining, remaining.isFinite {
+                            Text("About \(duration(remaining)) remaining")
+                        }
+                    }
+                    .font(.system(size: 11)).foregroundStyle(.white.opacity(0.51))
+                }
+            }
+            .padding(15)
+            .background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 13))
+            Spacer(minLength: 0)
+            HStack {
+                Text("Notchloom stays available while files convert.")
+                    .font(.system(size: 11)).foregroundStyle(.white.opacity(0.46))
+                Spacer()
                 if converter.jobs.count > 1 {
                     Button("Cancel current") { converter.cancelCurrent() }
+                        .buttonStyle(.plain).foregroundStyle(.white.opacity(0.7))
+                        .frame(minHeight: 36)
                 }
-                Button("Cancel all") { converter.cancelAll() }
-                    .font(.system(size: 11))
+                Button(converter.jobs.count > 1 ? "Cancel all" : "Cancel") { converter.cancelAll() }
+                    .buttonStyle(.plain).foregroundStyle(.white)
+                    .padding(.horizontal, 14).frame(height: 36)
+                    .background(.white.opacity(0.11), in: Capsule())
             }
         }
     }
 
     private var resultView: some View {
-        VStack(alignment: .leading, spacing: 11) {
-            HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: 13) {
+            HStack(spacing: 13) {
                 Image(systemName: converter.failedCount == 0 && !converter.outputs.isEmpty
                       ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
-                    .font(.system(size: 26))
+                    .font(.system(size: 36))
                     .foregroundStyle(converter.failedCount == 0 && !converter.outputs.isEmpty ? .green : .orange)
-                    .symbolEffect(.bounce, value: converter.stage)
-                VStack(alignment: .leading, spacing: 2) {
+                    .symbolEffect(.bounce, value: resultAnimationTrigger)
+                    .onAppear {
+                        if !reduceMotion { resultAnimationTrigger += 1 }
+                    }
+                VStack(alignment: .leading, spacing: 3) {
                     Text(converter.failedCount == 0 && !converter.outputs.isEmpty
                          ? "Conversion complete" : "Conversion finished")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 16, weight: .semibold))
                     Text("\(converter.completedCount) complete · \(converter.failedCount) failed" +
                          (converter.cancelledCount > 0 ? " · \(converter.cancelledCount) cancelled" : ""))
                         .font(.system(size: 11)).foregroundStyle(.white.opacity(0.55))
                 }
                 Spacer()
-                Button { converter.close() } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 17)).foregroundStyle(.white.opacity(0.5))
-                }
             }
             if let output = converter.outputs.first {
-                HStack {
+                HStack(spacing: 12) {
                     Image(nsImage: NSWorkspace.shared.icon(forFile: output.path))
-                        .resizable().scaledToFit().frame(width: 22, height: 22)
-                    Text(output.lastPathComponent)
-                        .font(.system(size: 12)).lineLimit(1).truncationMode(.middle)
+                        .resizable().scaledToFit().frame(width: 45, height: 45)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(output.lastPathComponent)
+                            .font(.system(size: 13, weight: .semibold))
+                            .lineLimit(1).truncationMode(.middle)
+                        Text(fileSize(output)).font(.system(size: 11))
+                            .foregroundStyle(.white.opacity(0.55))
+                    }
                     Spacer()
-                    Text(fileSize(output)).font(.system(size: 10)).foregroundStyle(.white.opacity(0.55))
+                    Image(systemName: "hand.draw")
+                        .font(.system(size: 13)).foregroundStyle(.white.opacity(0.4))
                 }
+                .padding(12)
+                .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 13))
                 .onDrag { NSItemProvider(contentsOf: output) ?? NSItemProvider() }
+                .help("Drag the converted file into Finder or another app")
             }
             if let message = converter.message {
-                Text(message).font(.system(size: 11)).foregroundStyle(.orange).lineLimit(2)
+                Text(message).font(.system(size: 12)).foregroundStyle(.orange)
+                    .lineLimit(3).fixedSize(horizontal: false, vertical: true)
             }
+            if showDetails, let details = converter.technicalDetails {
+                ScrollView {
+                    Text(details).font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.52))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxHeight: 72)
+                .padding(9)
+                .background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 9))
+            }
+            Spacer(minLength: 0)
             HStack(spacing: 10) {
                 if !converter.outputs.isEmpty {
                     Button("Reveal in Finder") {
                         NSWorkspace.shared.activateFileViewerSelecting(converter.outputs)
                     }
+                    .buttonStyle(.plain).frame(minHeight: 36)
                     Button("Open") { converter.outputs.forEach { NSWorkspace.shared.open($0) } }
+                        .buttonStyle(.plain).frame(minHeight: 36)
                 }
                 if converter.failedCount > 0 {
                     Button("Retry failed") { converter.retryFailed() }
-                    Button(showDetails ? "Hide details" : "Details") { showDetails.toggle() }
-                }
-                if let next = converter.nextCategory {
-                    Button("Next: \(next.rawValue)") { converter.continueWithNextCategory() }
+                        .buttonStyle(.plain).frame(minHeight: 36)
+                    Button(showDetails ? "Hide details" : "Details") { withAnimation(panelAnimation) { showDetails.toggle() } }
+                        .buttonStyle(.plain).frame(minHeight: 36)
                 }
                 Spacer()
+                if let next = converter.nextCategory {
+                    Button("Next: \(next.rawValue)") { converter.continueWithNextCategory() }
+                        .buttonStyle(.plain).foregroundStyle(.cyan).frame(minHeight: 36)
+                }
             }
-            .font(.system(size: 11))
-            if showDetails, let details = converter.technicalDetails {
-                Text(details).font(.system(size: 9, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.48)).lineLimit(2)
-            }
+            .font(.system(size: 12, weight: .medium))
         }
     }
 

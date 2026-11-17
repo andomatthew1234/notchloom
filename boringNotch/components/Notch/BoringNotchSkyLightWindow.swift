@@ -33,6 +33,8 @@ extension SkyLightOperator {
 
 class BoringNotchSkyLightWindow: NSPanel {
     private var isSkyLightEnabled: Bool = false
+    /// Enabled only while the user is typing in Convert's format search.
+    var allowsConverterKeyboardFocus = false
     
     override init(
         contentRect: NSRect,
@@ -109,6 +111,6 @@ class BoringNotchSkyLightWindow: NSPanel {
     
     private var observers: Set<AnyCancellable> = []
     
-    override var canBecomeKey: Bool { false }
+    override var canBecomeKey: Bool { allowsConverterKeyboardFocus }
     override var canBecomeMain: Bool { false }
 }

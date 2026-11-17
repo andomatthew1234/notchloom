@@ -10,6 +10,7 @@ final class ConversionManager: ObservableObject {
     enum Stage: Equatable { case idle, preparing, setup, running, finished }
 
     @Published private(set) var stage: Stage = .idle
+    @Published private(set) var presentationScreenID: String?
     @Published private(set) var inputs: [ConversionInput] = []
     @Published private(set) var jobs: [ConversionJob] = []
     @Published private(set) var formats: [ConversionFormat] = []
@@ -66,11 +67,12 @@ final class ConversionManager: ObservableObject {
         return currentJob == nil ? done / Double(jobs.count) : nil
     }
 
-    func prepare(providers: [NSItemProvider]) {
+    func prepare(providers: [NSItemProvider], screenID: String?) {
         guard stage == .idle || stage == .finished else { return }
         generation = UUID()
         let currentGeneration = generation
         resetState()
+        presentationScreenID = screenID
         stage = .preparing
         holdInteraction()
         Task { @MainActor in
@@ -320,6 +322,7 @@ final class ConversionManager: ObservableObject {
 
     private func resetState() {
         dismissTask?.cancel()
+        presentationScreenID = nil
         inputs = []
         convertedInputIDs = []
         selectedInputID = nil

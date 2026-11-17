@@ -246,6 +246,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let styleMask: NSWindow.StyleMask = [.borderless, .nonactivatingPanel, .utilityWindow, .hudWindow]
         
         let window = BoringNotchSkyLightWindow(contentRect: rect, styleMask: styleMask, backing: .buffered, defer: false)
+        viewModel.hostWindow = window
         
         // Enable SkyLight only when screen is locked
         if isScreenLocked {

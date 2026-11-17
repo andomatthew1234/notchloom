@@ -10,6 +10,7 @@ import AppKit
 
 struct ShelfView: View {
     @EnvironmentObject var vm: BoringViewModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject var tvm = ShelfStateViewModel.shared
     @StateObject var selection = ShelfSelectionModel.shared
     @ObservedObject private var converter = ConversionManager.shared
@@ -18,7 +19,7 @@ struct ShelfView: View {
 
     var body: some View {
         Group {
-            if converter.stage == .idle {
+            if converter.stage == .idle || converter.presentationScreenID != vm.screenUUID {
                 HStack(spacing: 10) {
                     FileShareView()
                         .frame(width: 138, height: 150)
@@ -32,12 +33,15 @@ struct ShelfView: View {
                         }
                 }
                 .padding(.horizontal, 16)
+                .transition(reduceMotion ? .opacity : .opacity.combined(with: .offset(y: -8)))
             } else {
                 ConvertPanelView()
-                    .frame(height: 150)
+                    .frame(height: max(190, vm.notchSize.height - max(36, vm.effectiveClosedNotchHeight) - 20))
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .offset(y: 12)))
             }
         }
-        .animation(.spring(response: 0.36, dampingFraction: 0.85), value: converter.stage)
+        .animation(reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.4, dampingFraction: 0.86),
+                   value: converter.stage)
         // Bind Quick Look to shelf selection
         .onChange(of: selection.selectedIDs) {
             updateQuickLookSelection()

@@ -5,6 +5,7 @@
 //  Created by Harsh Vardhan  Goswami  on 04/08/24.
 //
 
+import AppKit
 import Combine
 import Defaults
 import SwiftUI
@@ -37,6 +38,9 @@ class BoringViewModel: NSObject, ObservableObject {
 
     @Published var notchSize: CGSize = getClosedNotchSize()
     @Published var closedNotchSize: CGSize = getClosedNotchSize()
+    @Published var windowContentSize: CGSize = windowSize
+    @Published private(set) var conversionExpanded = false
+    weak var hostWindow: NSWindow?
     
     let webcamManager = WebcamManager.shared
     @Published var isCameraExpanded: Bool = false
@@ -191,7 +195,7 @@ class BoringViewModel: NSObject, ObservableObject {
     }
 
     func open() {
-        self.notchSize = openNotchSize
+        self.notchSize = conversionExpanded ? getConvertNotchSize(screenUUID: screenUUID) : openNotchSize
         self.notchState = .open
         
         // Force music information update when notch is opened
@@ -203,6 +207,7 @@ class BoringViewModel: NSObject, ObservableObject {
         if SharingStateManager.shared.preventNotchClose {
             return
         }
+        if conversionExpanded { setConversionExpanded(false) }
         self.notchSize = getClosedNotchSize(screenUUID: self.screenUUID)
         self.closedNotchSize = self.notchSize
         self.notchState = .closed
@@ -216,6 +221,34 @@ class BoringViewModel: NSObject, ObservableObject {
             coordinator.currentView = .shelf
         } else if !coordinator.openLastTabByDefault {
             coordinator.currentView = .tools
+        }
+    }
+
+    @MainActor func setConversionExpanded(_ expanded: Bool, reduceMotion: Bool = false) {
+        let target = expanded ? getConvertNotchSize(screenUUID: screenUUID) : openNotchSize
+        let content = expanded
+            ? CGSize(width: target.width, height: target.height + shadowPadding)
+            : windowSize
+        guard conversionExpanded != expanded || windowContentSize != content else { return }
+        conversionExpanded = expanded
+        windowContentSize = content
+        if notchState == .open { notchSize = target }
+
+        guard let window = hostWindow else { return }
+        let screen = screenUUID.flatMap { NSScreen.screen(withUUID: $0) } ?? window.screen ?? NSScreen.main
+        guard let screen else { return }
+        var frame = window.frame
+        frame.size = content
+        frame.origin.x = screen.frame.midX - content.width / 2
+        frame.origin.y = screen.frame.maxY - content.height
+        if reduceMotion {
+            window.setFrame(frame, display: true)
+        } else {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.38
+                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                window.animator().setFrame(frame, display: true)
+            }
         }
     }
 

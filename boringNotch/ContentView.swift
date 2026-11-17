@@ -16,6 +16,7 @@ import SwiftUIIntrospect
 @MainActor
 struct ContentView: View {
     @EnvironmentObject var vm: BoringViewModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject var webcamManager = WebcamManager.shared
 
     @ObservedObject var coordinator = BoringViewCoordinator.shared
@@ -24,6 +25,7 @@ struct ContentView: View {
     @ObservedObject var brightnessManager = BrightnessManager.shared
     @ObservedObject var volumeManager = VolumeManager.shared
     @ObservedObject private var notificationMirror = NotificationMirror.shared
+    @ObservedObject private var converter = ConversionManager.shared
     @State private var hoverTask: Task<Void, Never>?
     @State private var isHovering: Bool = false
     @State private var anyDropDebounceTask: Task<Void, Never>?
@@ -53,9 +55,10 @@ struct ContentView: View {
     private var currentNotchShape: NotchShape {
         NotchShape(
             topCornerRadius: topCornerRadius,
-            bottomCornerRadius: ((vm.notchState == .open) && Defaults[.cornerRadiusScaling])
-                ? cornerRadiusInsets.opened.bottom
-                : cornerRadiusInsets.closed.bottom
+            bottomCornerRadius: vm.conversionExpanded && vm.notchState == .open ? 29 :
+                (((vm.notchState == .open) && Defaults[.cornerRadiusScaling])
+                    ? cornerRadiusInsets.opened.bottom
+                    : cornerRadiusInsets.closed.bottom)
         )
     }
 
@@ -134,6 +137,8 @@ struct ContentView: View {
                         
                         return view
                             .animation(vm.notchState == .open ? openAnimation : closeAnimation, value: vm.notchState)
+                            .animation(reduceMotion ? .easeOut(duration: 0.15) :
+                                .spring(response: 0.4, dampingFraction: 0.86), value: vm.notchSize)
                             .animation(.smooth, value: gestureProgress)
                     }
                     .contentShape(Rectangle())
@@ -228,7 +233,7 @@ struct ContentView: View {
             }
         }
         .padding(.bottom, 8)
-        .frame(maxWidth: windowSize.width, maxHeight: windowSize.height, alignment: .top)
+        .frame(width: vm.windowContentSize.width, height: vm.windowContentSize.height, alignment: .top)
         .compositingGroup()
         .scaleEffect(
             x: gestureScale,
@@ -269,6 +274,20 @@ struct ContentView: View {
                     vm.close()
                 }
             }
+        }
+        .onChange(of: converter.stage) { _, _ in updateConverterPresentation() }
+        .onChange(of: coordinator.currentView) { _, _ in updateConverterPresentation() }
+        .onChange(of: converter.presentationScreenID) { _, _ in updateConverterPresentation() }
+        .onChange(of: vm.screenUUID) { _, _ in updateConverterPresentation() }
+        .onAppear { updateConverterPresentation() }
+    }
+
+    private func updateConverterPresentation() {
+        let expanded = converter.stage != .idle && coordinator.currentView == .shelf
+            && converter.presentationScreenID == vm.screenUUID
+        withAnimation(reduceMotion ? .easeOut(duration: 0.15) :
+                .spring(response: 0.4, dampingFraction: 0.86)) {
+            vm.setConversionExpanded(expanded, reduceMotion: reduceMotion)
         }
     }
 

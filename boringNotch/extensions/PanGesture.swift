@@ -18,6 +18,35 @@ enum PanDirection {
     func signed(deltaX: CGFloat, deltaY: CGFloat) -> CGFloat { (isHorizontal ? deltaX : deltaY) * sign }
 }
 
+/// A scrollable child owns wheel and trackpad events inside its actual AppKit bounds.
+/// The notch monitors observe events without consuming them, so the child's native
+/// NSScrollView still receives momentum, mouse-wheel and precise trackpad events.
+@MainActor private final class ScrollGestureOwnership {
+    static let shared = ScrollGestureOwnership()
+    private let regions = NSHashTable<NSView>.weakObjects()
+
+    func add(_ view: NSView) { regions.add(view) }
+    func remove(_ view: NSView) { regions.remove(view) }
+    func owns(_ event: NSEvent) -> Bool {
+        guard let window = event.window else { return false }
+        return regions.allObjects.contains { view in
+            view.window === window && view.bounds.contains(view.convert(event.locationInWindow, from: nil))
+        }
+    }
+}
+
+struct ScrollGestureExclusionArea: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        ScrollGestureOwnership.shared.add(view)
+        return view
+    }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+    static func dismantleNSView(_ nsView: NSView, coordinator: ()) {
+        ScrollGestureOwnership.shared.remove(nsView)
+    }
+}
+
 extension View {
     func panGesture(direction: PanDirection, threshold: CGFloat = 4, action: @escaping (CGFloat, NSEvent.Phase) -> Void) -> some View {
         self
@@ -88,9 +117,21 @@ private struct ScrollMonitor: NSViewRepresentable {
             removeMonitor()
             monitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel]) { [weak self, weak view] event in
                 guard let self = self, event.window === view?.window else { return event }
+                if ScrollGestureOwnership.shared.owns(event) {
+                    self.cancelGesture()
+                    return event
+                }
                 self.handleScroll(event)
                 return event
             }
+        }
+
+        private func cancelGesture() {
+            endTask?.cancel()
+            endTask = nil
+            if active { action(0, .ended) }
+            active = false
+            accumulated = 0
         }
 
         func removeMonitor() {
@@ -180,6 +221,10 @@ struct HorizontalTabSwipeMonitor: NSViewRepresentable {
                 guard let self, let view, event.window === view.window,
                       view.bounds.contains(view.convert(event.locationInWindow, from: nil)),
                       event.hasPreciseScrollingDeltas else { return event }
+                if ScrollGestureOwnership.shared.owns(event) {
+                    self.reset()
+                    return event
+                }
                 self.handle(event)
                 return event
             }
