@@ -207,7 +207,10 @@ class BoringViewModel: NSObject, ObservableObject {
         if SharingStateManager.shared.preventNotchClose {
             return
         }
-        if conversionExpanded { setConversionExpanded(false) }
+        if conversionExpanded {
+            setConversionExpanded(false)
+            finishConversionContraction()
+        }
         self.notchSize = getClosedNotchSize(screenUUID: self.screenUUID)
         self.closedNotchSize = self.notchSize
         self.notchState = .closed
@@ -224,16 +227,31 @@ class BoringViewModel: NSObject, ObservableObject {
         }
     }
 
-    @MainActor func setConversionExpanded(_ expanded: Bool, reduceMotion: Bool = false) {
-        let target = expanded ? getConvertNotchSize(screenUUID: screenUUID) : openNotchSize
-        let content = expanded
-            ? CGSize(width: target.width, height: target.height + shadowPadding)
-            : windowSize
-        guard conversionExpanded != expanded || windowContentSize != content else { return }
+    @MainActor func setConversionExpanded(_ expanded: Bool, compact: Bool = false) {
+        let full = getConvertNotchSize(screenUUID: screenUUID)
+        let target = expanded
+            ? (compact ? CGSize(width: min(540, full.width), height: min(336, full.height)) : full)
+            : openNotchSize
+        let content = CGSize(width: full.width, height: full.height + shadowPadding)
+        guard conversionExpanded != expanded || (expanded && notchSize != target) else { return }
+        // Grow the transparent host first. On exit keep it large until SwiftUI has
+        // finished drawing the shrinking surface; resizing it sooner clips and
+        // relocates the animated notch above the display edge.
+        if expanded && windowContentSize != content {
+            windowContentSize = content
+            resizeHostWindow(to: content)
+        }
         conversionExpanded = expanded
-        windowContentSize = content
         if notchState == .open { notchSize = target }
+    }
 
+    @MainActor func finishConversionContraction() {
+        guard !conversionExpanded else { return }
+        windowContentSize = windowSize
+        resizeHostWindow(to: windowSize)
+    }
+
+    @MainActor private func resizeHostWindow(to content: CGSize) {
         guard let window = hostWindow else { return }
         let screen = screenUUID.flatMap { NSScreen.screen(withUUID: $0) } ?? window.screen ?? NSScreen.main
         guard let screen else { return }
@@ -241,15 +259,7 @@ class BoringViewModel: NSObject, ObservableObject {
         frame.size = content
         frame.origin.x = screen.frame.midX - content.width / 2
         frame.origin.y = screen.frame.maxY - content.height
-        if reduceMotion {
-            window.setFrame(frame, display: true)
-        } else {
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.38
-                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-                window.animator().setFrame(frame, display: true)
-            }
-        }
+        window.setFrame(frame, display: true)
     }
 
     func closeHello() {

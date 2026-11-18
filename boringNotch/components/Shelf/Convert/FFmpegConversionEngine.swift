@@ -69,6 +69,8 @@ enum ExternalProcess {
             try await withCheckedThrowingContinuation { continuation in
                 do {
                     try process.run()
+                    // Cancellation can arrive between the preflight check and launch.
+                    if Task.isCancelled && process.isRunning { process.terminate() }
                     DispatchQueue.global(qos: .userInitiated).async {
                         process.waitUntilExit()
                         stdout.fileHandleForReading.readabilityHandler = nil

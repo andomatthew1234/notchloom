@@ -1,4 +1,5 @@
 import AppKit
+import QuickLookThumbnailing
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -45,21 +46,22 @@ struct ConvertTargetView: View {
 }
 
 struct ConvertPanelView: View {
+    private enum Page: Equatable { case setup, formats, settings }
     @EnvironmentObject private var vm: BoringViewModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var converter = ConversionManager.shared
     @ObservedObject private var preferences = ConversionPreferences.shared
-    @State private var choosingFormat = false
-    @State private var showingSettings = false
+    @State private var page: Page = .setup
     @State private var search = ""
     @State private var showDetails = false
     @State private var resultAnimationTrigger = 0
+    @State private var previewImage: NSImage?
     @FocusState private var searchFocused: Bool
 
     private var selected: ConversionFormat? { converter.selectedFormat }
     private var first: ConversionInput? { converter.categoryInputs.first }
     private var panelAnimation: Animation {
-        reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.36, dampingFraction: 0.86)
+        reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.42, dampingFraction: 0.9)
     }
     private var inputFormatName: String {
         first?.type.preferredFilenameExtension?.uppercased() ?? first?.displayType ?? "FILE"
@@ -74,21 +76,22 @@ struct ConvertPanelView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            Rectangle().fill(.white.opacity(0.08)).frame(height: 1).padding(.top, 10).padding(.bottom, 14)
+            Rectangle().fill(.white.opacity(0.075)).frame(height: 1).padding(.top, 11).padding(.bottom, 15)
             Group {
                 switch converter.stage {
                 case .idle: EmptyView()
                 case .preparing: loadingView
                 case .setup:
-                    if choosingFormat { formatPicker }
-                    else if showingSettings { settingsView }
-                    else { setupView }
+                    switch page {
+                    case .setup: setupView
+                    case .formats: formatPicker
+                    case .settings: settingsView
+                    }
                 case .running: progressView
                 case .finished: resultView
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .id("\(converter.stage)-\(choosingFormat)-\(showingSettings)")
             .transition(reduceMotion ? .opacity : .opacity.combined(with: .offset(y: 9)))
         }
         .padding(.horizontal, 22)
@@ -98,10 +101,9 @@ struct ConvertPanelView: View {
         .background(ScrollGestureExclusionArea())
         .onHover(perform: converter.hoverChanged)
         .animation(panelAnimation, value: converter.stage)
-        .animation(panelAnimation, value: choosingFormat)
-        .animation(panelAnimation, value: showingSettings)
-        .onChange(of: choosingFormat) { _, isChoosing in
-            if isChoosing {
+        .animation(panelAnimation, value: page)
+        .onChange(of: page) { _, newPage in
+            if newPage == .formats {
                 if let window = vm.hostWindow as? BoringNotchSkyLightWindow {
                     window.allowsConverterKeyboardFocus = true
                     window.makeKey()
@@ -115,6 +117,15 @@ struct ConvertPanelView: View {
             if stage != .setup { releaseKeyboardFocus() }
         }
         .onDisappear { releaseKeyboardFocus() }
+        .task(id: first?.id) {
+            previewImage = nil
+            guard let input = first, !input.isDirectory else { return }
+            let request = QLThumbnailGenerator.Request(
+                fileAt: input.url, size: CGSize(width: 128, height: 128),
+                scale: NSScreen.main?.backingScaleFactor ?? 2,
+                representationTypes: [.thumbnail, .icon])
+            previewImage = try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: request).nsImage
+        }
     }
 
     private func releaseKeyboardFocus() {
@@ -132,26 +143,33 @@ struct ConvertPanelView: View {
                 .foregroundStyle(.cyan)
                 .frame(width: 34, height: 34)
                 .background(.cyan.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+                .symbolEffect(.pulse, options: .repeating, isActive: converter.stage == .running && !reduceMotion)
             VStack(alignment: .leading, spacing: 1) {
                 Text(converter.stage == .running ? "Converting" :
                      converter.categoryInputs.count > 1 ? "Convert Files" : "Convert File")
                     .font(.system(size: 17, weight: .semibold))
-                if converter.stage == .running || converter.jobs.count > 1 {
-                    Text("\(converter.jobs.count > 0 ? converter.jobs.count : converter.categoryInputs.count) files")
-                        .font(.system(size: 11)).foregroundStyle(.white.opacity(0.48))
-                }
+                Text(headerSubtitle)
+                    .font(.system(size: 11)).foregroundStyle(.white.opacity(0.48))
             }
             Spacer()
             Button { converter.close() } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.68))
-                    .frame(width: 30, height: 30)
-                    .background(.white.opacity(0.08), in: Circle())
+                    .frame(width: 32, height: 32)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ConvertActionStyle(.close))
             .help("Close Convert")
             .accessibilityLabel("Close Convert")
+        }
+    }
+
+    private var headerSubtitle: String {
+        switch converter.stage {
+        case .preparing: "Preparing your files"
+        case .running: converter.jobs.count > 1 ? "\(converter.jobs.count) files in the queue" : "Your file is on its way"
+        case .finished: converter.failedCount > 0 ? "Review the result" : "Ready to use"
+        case .setup, .idle: converter.categoryInputs.count > 1
+            ? "\(converter.categoryInputs.count) files · choose an output" : "Choose a format and make it yours"
         }
     }
 
@@ -175,13 +193,12 @@ struct ConvertPanelView: View {
                         Image(systemName: "arrow.right")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(.cyan)
+                            .contentTransition(.symbolEffect(.replace))
                             .symbolEffect(.pulse, value: converter.selectedFormatID)
                             .frame(maxWidth: .infinity)
                         formatChip(selected?.name ?? "Choose format", caption: "TO")
                     }
-                    .padding(.horizontal, 10)
-                    .frame(height: 51)
-                    .background(.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 12))
+                    .frame(height: 57)
 
                     VStack(alignment: .leading, spacing: 6) {
                         Text("OUTPUT FORMAT")
@@ -189,7 +206,7 @@ struct ConvertPanelView: View {
                             .tracking(0.8).foregroundStyle(.white.opacity(0.47))
                         Button {
                             search = ""
-                            withAnimation(panelAnimation) { choosingFormat = true }
+                            withAnimation(panelAnimation) { page = .formats }
                         } label: {
                             HStack(spacing: 10) {
                                 Image(systemName: selected.map { icon(for: $0.category) } ?? "questionmark.circle")
@@ -224,25 +241,21 @@ struct ConvertPanelView: View {
             .scrollIndicators(.automatic)
             HStack(spacing: 10) {
                 Button("Cancel") { converter.close() }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.white.opacity(0.65))
-                    .frame(minWidth: 68, minHeight: 34)
+                    .buttonStyle(ConvertActionStyle(.secondary))
                 Spacer()
                 Button {
-                    withAnimation(panelAnimation) { showingSettings = true }
+                    withAnimation(panelAnimation) { page = .settings }
                 } label: {
                     Label("Advanced Settings", systemImage: "slider.horizontal.3")
                         .frame(minHeight: 34).padding(.horizontal, 10)
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.white.opacity(0.82))
+                .buttonStyle(ConvertActionStyle(.secondary))
                 Button { converter.start() } label: {
                     Label(converter.categoryInputs.count > 1 ? "Convert all" : "Convert", systemImage: "arrow.triangle.2.circlepath")
                         .font(.system(size: 12, weight: .semibold))
                         .padding(.horizontal, 17).frame(height: 36)
-                        .background(.cyan, in: Capsule()).foregroundStyle(.black)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ConvertActionStyle(.primary))
                 .disabled(selected == nil)
             }
         }
@@ -250,10 +263,11 @@ struct ConvertPanelView: View {
 
     private var fileCard: some View {
         HStack(spacing: 13) {
-            Image(nsImage: first.map { NSWorkspace.shared.icon(forFile: $0.url.path) } ?? NSImage())
-                .resizable().scaledToFit().frame(width: 49, height: 49)
-                .frame(width: 58, height: 58)
-                .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 11))
+            Image(nsImage: previewImage ?? first.map { NSWorkspace.shared.icon(forFile: $0.url.path) } ?? NSImage())
+                .resizable().scaledToFit().frame(width: 61, height: 61)
+                .frame(width: 72, height: 72)
+                .background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 12))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
             VStack(alignment: .leading, spacing: 4) {
                 Text(converter.categoryInputs.count == 1 ? first?.name ?? "File" :
                      "\(converter.categoryInputs.count) files to convert")
@@ -262,6 +276,10 @@ struct ConvertPanelView: View {
                 Text(first?.isDirectory == true ? "Folder" :
                      "\(first?.displayType ?? "File") · \(ByteCountFormatter.string(fromByteCount: converter.totalSize, countStyle: .file))")
                     .font(.system(size: 11)).foregroundStyle(.white.opacity(0.55))
+                if let duration = first?.duration {
+                    Text("\(Int(duration) / 60):\(String(format: "%02d", Int(duration) % 60)) duration")
+                        .font(.system(size: 11)).foregroundStyle(.white.opacity(0.45))
+                }
             }
             Spacer(minLength: 6)
             if converter.availableCategories.count > 1 {
@@ -286,8 +304,11 @@ struct ConvertPanelView: View {
                 .tracking(0.6).foregroundStyle(.white.opacity(0.43))
             Text(text).font(.system(size: 12, weight: .semibold))
                 .lineLimit(1).truncationMode(.tail)
+                .contentTransition(.opacity)
         }
-        .frame(width: 155, alignment: .leading)
+        .padding(.horizontal, 12)
+        .frame(width: 155, height: 54, alignment: .leading)
+        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 11))
     }
 
     private func icon(for category: ConversionCategory) -> String {
@@ -310,7 +331,7 @@ struct ConvertPanelView: View {
                         .font(.system(size: 11)).foregroundStyle(.white.opacity(0.53))
                 }
                 Spacer()
-                Button("Done") { withAnimation(panelAnimation) { choosingFormat = false } }
+                Button("Done") { withAnimation(panelAnimation) { page = .setup } }
                     .buttonStyle(.plain).foregroundStyle(.cyan)
             }
             TextField("Search formats", text: $search)
@@ -320,11 +341,11 @@ struct ConvertPanelView: View {
                 .onSubmit {
                     if let format = filteredFormats.first {
                         converter.selectedFormatID = format.id
-                        withAnimation(panelAnimation) { choosingFormat = false }
+                        withAnimation(panelAnimation) { page = .setup }
                     }
                 }
                 .onKeyPress(.escape) {
-                    withAnimation(panelAnimation) { choosingFormat = false }
+                    withAnimation(panelAnimation) { page = .setup }
                     return .handled
                 }
             ScrollView(.vertical) {
@@ -339,7 +360,7 @@ struct ConvertPanelView: View {
                             ForEach(options) { format in
                                 Button {
                                     converter.selectedFormatID = format.id
-                                    withAnimation(panelAnimation) { choosingFormat = false }
+                                    withAnimation(panelAnimation) { page = .setup }
                                 } label: {
                                     HStack(spacing: 10) {
                                         Image(systemName: icon(for: category))
@@ -378,7 +399,7 @@ struct ConvertPanelView: View {
             .scrollIndicators(.visible)
             .frame(maxHeight: .infinity)
             .onKeyPress(.escape) {
-                withAnimation(panelAnimation) { choosingFormat = false }
+                withAnimation(panelAnimation) { page = .setup }
                 return .handled
             }
         }
@@ -389,7 +410,7 @@ struct ConvertPanelView: View {
             HStack {
                 Text("Advanced Settings").font(.system(size: 15, weight: .semibold))
                 Spacer()
-                Button("Done") { withAnimation(panelAnimation) { showingSettings = false } }
+                Button("Done") { withAnimation(panelAnimation) { page = .setup } }
                     .buttonStyle(.plain).foregroundStyle(.cyan)
             }
             ScrollView {
@@ -466,7 +487,7 @@ struct ConvertPanelView: View {
                     Text(converter.currentJob?.input.name ?? "Preparing next file")
                         .font(.system(size: 14, weight: .semibold))
                         .lineLimit(1).truncationMode(.middle)
-                    Text("To \(converter.currentJob?.format.name ?? "output")")
+                    Text("\(converter.currentJob?.input.type.preferredFilenameExtension?.uppercased() ?? "FILE")  →  \(converter.currentJob?.format.name ?? "output")")
                         .font(.system(size: 11)).foregroundStyle(.white.opacity(0.54))
                 }
                 Spacer()
@@ -474,12 +495,12 @@ struct ConvertPanelView: View {
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.white.opacity(0.55))
             }
-            .padding(12)
-            .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 13))
+            .padding(13)
+            .background(.white.opacity(0.065), in: RoundedRectangle(cornerRadius: 14))
 
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Text("Conversion progress")
+                    Text(converter.overallProgress == nil ? "Working on your file" : "Conversion progress")
                         .font(.system(size: 12, weight: .medium))
                     Spacer()
                     if let value = converter.overallProgress {
@@ -487,11 +508,8 @@ struct ConvertPanelView: View {
                             .font(.system(size: 13, weight: .semibold)).foregroundStyle(.cyan)
                     }
                 }
-                if let value = converter.overallProgress {
-                    ProgressView(value: value).tint(.cyan)
-                } else {
-                    ProgressView().tint(.cyan)
-                }
+                ConversionProgressTrack(fraction: converter.overallProgress, reduceMotion: reduceMotion)
+                    .frame(height: 11)
                 TimelineView(.periodic(from: .now, by: 1)) { context in
                     let elapsed = converter.currentJob?.startedAt.map { context.date.timeIntervalSince($0) } ?? 0
                     HStack {
@@ -504,39 +522,41 @@ struct ConvertPanelView: View {
                     .font(.system(size: 11)).foregroundStyle(.white.opacity(0.51))
                 }
             }
-            .padding(15)
-            .background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 13))
+            .padding(17)
+            .background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 14))
             Spacer(minLength: 0)
             HStack {
-                Text("Notchloom stays available while files convert.")
+                Text("The original stays untouched.")
                     .font(.system(size: 11)).foregroundStyle(.white.opacity(0.46))
                 Spacer()
                 if converter.jobs.count > 1 {
                     Button("Cancel current") { converter.cancelCurrent() }
-                        .buttonStyle(.plain).foregroundStyle(.white.opacity(0.7))
-                        .frame(minHeight: 36)
+                        .buttonStyle(ConvertActionStyle(.secondary))
                 }
-                Button(converter.jobs.count > 1 ? "Cancel all" : "Cancel") { converter.cancelAll() }
-                    .buttonStyle(.plain).foregroundStyle(.white)
-                    .padding(.horizontal, 14).frame(height: 36)
-                    .background(.white.opacity(0.11), in: Capsule())
+                Button(converter.jobs.count > 1 ? "Cancel all" : "Cancel Conversion") { converter.cancelAll() }
+                    .buttonStyle(ConvertActionStyle(.secondary))
             }
         }
     }
 
     private var resultView: some View {
         VStack(alignment: .leading, spacing: 13) {
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: 13) {
             HStack(spacing: 13) {
-                Image(systemName: converter.failedCount == 0 && !converter.outputs.isEmpty
+                Image(systemName: converter.presentation == .cancelled ? "xmark.circle.fill" :
+                      converter.failedCount == 0 && !converter.outputs.isEmpty
                       ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
                     .font(.system(size: 36))
-                    .foregroundStyle(converter.failedCount == 0 && !converter.outputs.isEmpty ? .green : .orange)
+                    .foregroundStyle(converter.presentation == .cancelled ? .white.opacity(0.7) :
+                        converter.failedCount == 0 && !converter.outputs.isEmpty ? .green : .orange)
                     .symbolEffect(.bounce, value: resultAnimationTrigger)
                     .onAppear {
                         if !reduceMotion { resultAnimationTrigger += 1 }
                     }
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(converter.failedCount == 0 && !converter.outputs.isEmpty
+                    Text(converter.presentation == .cancelled ? "Conversion canceled" :
+                         converter.failedCount == 0 && !converter.outputs.isEmpty
                          ? "Conversion complete" : "Conversion finished")
                         .font(.system(size: 16, weight: .semibold))
                     Text("\(converter.completedCount) complete · \(converter.failedCount) failed" +
@@ -570,35 +590,35 @@ struct ConvertPanelView: View {
                     .lineLimit(3).fixedSize(horizontal: false, vertical: true)
             }
             if showDetails, let details = converter.technicalDetails {
-                ScrollView {
-                    Text(details).font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.52))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .frame(maxHeight: 72)
+                Text(details).font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.52))
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(9)
                 .background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 9))
             }
-            Spacer(minLength: 0)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .scrollIndicators(.automatic)
             HStack(spacing: 10) {
                 if !converter.outputs.isEmpty {
                     Button("Reveal in Finder") {
                         NSWorkspace.shared.activateFileViewerSelecting(converter.outputs)
                     }
-                    .buttonStyle(.plain).frame(minHeight: 36)
+                    .buttonStyle(ConvertActionStyle(.secondary))
                     Button("Open") { converter.outputs.forEach { NSWorkspace.shared.open($0) } }
-                        .buttonStyle(.plain).frame(minHeight: 36)
+                        .buttonStyle(ConvertActionStyle(.primary))
                 }
                 if converter.failedCount > 0 {
                     Button("Retry failed") { converter.retryFailed() }
-                        .buttonStyle(.plain).frame(minHeight: 36)
+                    .buttonStyle(ConvertActionStyle(.secondary))
                     Button(showDetails ? "Hide details" : "Details") { withAnimation(panelAnimation) { showDetails.toggle() } }
-                        .buttonStyle(.plain).frame(minHeight: 36)
+                        .buttonStyle(ConvertActionStyle(.secondary))
                 }
                 Spacer()
                 if let next = converter.nextCategory {
                     Button("Next: \(next.rawValue)") { converter.continueWithNextCategory() }
-                        .buttonStyle(.plain).foregroundStyle(.cyan).frame(minHeight: 36)
+                        .buttonStyle(ConvertActionStyle(.secondary))
                 }
             }
             .font(.system(size: 12, weight: .medium))
@@ -613,5 +633,80 @@ struct ConvertPanelView: View {
     private func fileSize(_ url: URL) -> String {
         let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
         return ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file)
+    }
+}
+
+private struct ConvertActionStyle: ButtonStyle {
+    enum Emphasis { case primary, secondary, close }
+    let emphasis: Emphasis
+    init(_ emphasis: Emphasis) { self.emphasis = emphasis }
+
+    func makeBody(configuration: Configuration) -> some View {
+        ButtonContent(configuration: configuration, emphasis: emphasis)
+    }
+
+    private struct ButtonContent: View {
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+        let configuration: Configuration
+        let emphasis: Emphasis
+        @State private var hovered = false
+
+        var body: some View {
+            configuration.label
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(emphasis == .primary ? Color.black : Color.white.opacity(hovered ? 1 : 0.82))
+                .padding(.horizontal, emphasis == .close ? 0 : 13)
+                .frame(minHeight: emphasis == .close ? 32 : 36)
+                .background(background, in: emphasis == .close
+                    ? AnyShape(Circle()) : AnyShape(RoundedRectangle(cornerRadius: 11)))
+                .scaleEffect(configuration.isPressed ? 0.97 : 1)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: configuration.isPressed)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: hovered)
+                .onHover { hovered = $0 }
+        }
+
+        private var background: Color {
+            if emphasis == .primary { return .cyan.opacity(configuration.isPressed ? 0.8 : hovered ? 0.91 : 1) }
+            return .white.opacity(configuration.isPressed ? 0.18 : hovered ? 0.13 : 0.075)
+        }
+    }
+}
+
+private struct ConversionProgressTrack: View {
+    let fraction: Double?
+    let reduceMotion: Bool
+    @State private var sweep = false
+
+    var body: some View {
+        GeometryReader { geometry in
+            let width = geometry.size.width
+            ZStack(alignment: .leading) {
+                Capsule().fill(.white.opacity(0.12))
+                if let fraction {
+                    let filled = width * min(1, max(0, fraction))
+                    Capsule().fill(.cyan)
+                        .frame(width: filled)
+                        .overlay(alignment: .leading) {
+                            if !reduceMotion && filled > 20 {
+                                LinearGradient(colors: [.clear, .white.opacity(0.34), .clear],
+                                               startPoint: .leading, endPoint: .trailing)
+                                    .frame(width: 48)
+                                    .offset(x: sweep ? filled : -48)
+                                    .mask(Capsule().frame(width: filled))
+                            }
+                        }
+                        .animation(reduceMotion ? nil : .easeOut(duration: 0.35), value: fraction)
+                } else {
+                    Capsule().fill(.cyan.opacity(0.85))
+                        .frame(width: max(44, width * 0.27))
+                        .offset(x: reduceMotion ? 0 : sweep ? width : -max(44, width * 0.27))
+                }
+            }
+            .clipShape(Capsule())
+            .animation(reduceMotion ? nil : .linear(duration: 1.85).repeatForever(autoreverses: false), value: sweep)
+        }
+        .onAppear { sweep = true }
+        .accessibilityLabel(fraction.map { "Conversion \(Int($0 * 100)) percent complete" }
+                            ?? "Conversion in progress")
     }
 }

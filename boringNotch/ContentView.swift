@@ -137,8 +137,6 @@ struct ContentView: View {
                         
                         return view
                             .animation(vm.notchState == .open ? openAnimation : closeAnimation, value: vm.notchState)
-                            .animation(reduceMotion ? .easeOut(duration: 0.15) :
-                                .spring(response: 0.4, dampingFraction: 0.86), value: vm.notchSize)
                             .animation(.smooth, value: gestureProgress)
                     }
                     .contentShape(Rectangle())
@@ -275,7 +273,7 @@ struct ContentView: View {
                 }
             }
         }
-        .onChange(of: converter.stage) { _, _ in updateConverterPresentation() }
+        .onChange(of: converter.presentation) { _, _ in updateConverterPresentation() }
         .onChange(of: coordinator.currentView) { _, _ in updateConverterPresentation() }
         .onChange(of: converter.presentationScreenID) { _, _ in updateConverterPresentation() }
         .onChange(of: vm.screenUUID) { _, _ in updateConverterPresentation() }
@@ -283,11 +281,20 @@ struct ContentView: View {
     }
 
     private func updateConverterPresentation() {
-        let expanded = converter.stage != .idle && coordinator.currentView == .shelf
-            && converter.presentationScreenID == vm.screenUUID
+        let ownsPresentation = converter.presentationScreenID == vm.screenUUID
+        let expanded = converter.presentation.isExpanded && coordinator.currentView == .shelf
+            && ownsPresentation
+        let compact = [.converting, .success, .failure, .cancelled].contains(converter.presentation)
+        let presentation = converter.presentation
         withAnimation(reduceMotion ? .easeOut(duration: 0.15) :
-                .spring(response: 0.4, dampingFraction: 0.86)) {
-            vm.setConversionExpanded(expanded, reduceMotion: reduceMotion)
+                .spring(response: 0.42, dampingFraction: 0.9), completionCriteria: .logicallyComplete) {
+            vm.setConversionExpanded(expanded, compact: compact)
+        } completion: {
+            if presentation == .entering && ownsPresentation { converter.entranceCompleted() }
+            if presentation == .exiting && ownsPresentation {
+                vm.finishConversionContraction()
+                converter.exitCompleted()
+            }
         }
     }
 

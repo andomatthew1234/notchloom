@@ -8,8 +8,13 @@ final class ConversionManager: ObservableObject {
     static let shared = ConversionManager()
 
     enum Stage: Equatable { case idle, preparing, setup, running, finished }
+    enum Presentation: Equatable {
+        case shelf, entering, ready, converting, success, failure, cancelled, exiting
+        var isExpanded: Bool { self != .shelf && self != .exiting }
+    }
 
     @Published private(set) var stage: Stage = .idle
+    @Published private(set) var presentation: Presentation = .shelf
     @Published private(set) var presentationScreenID: String?
     @Published private(set) var inputs: [ConversionInput] = []
     @Published private(set) var jobs: [ConversionJob] = []
@@ -31,6 +36,7 @@ final class ConversionManager: ObservableObject {
     private var currentTask: Task<Void, Error>?
     private var dismissTask: Task<Void, Never>?
     private var cancelAllRequested = false
+    private var closeAfterCancellation = false
     private var interactionHeld = false
     private var generation = UUID()
     private var convertedInputIDs = Set<UUID>()
@@ -68,11 +74,13 @@ final class ConversionManager: ObservableObject {
     }
 
     func prepare(providers: [NSItemProvider], screenID: String?) {
-        guard stage == .idle || stage == .finished else { return }
+        guard presentation == .shelf || presentation == .success || presentation == .failure
+                || presentation == .cancelled else { return }
         generation = UUID()
         let currentGeneration = generation
         resetState()
         presentationScreenID = screenID
+        presentation = .entering
         stage = .preparing
         holdInteraction()
         Task { @MainActor in
@@ -105,12 +113,13 @@ final class ConversionManager: ObservableObject {
                     }
                 }
             }
-            guard generation == currentGeneration else { return }
+            guard generation == currentGeneration, presentation != .exiting else { return }
             inputs = found
             if found.isEmpty {
                 message = firstRejection ?? "No supported files were found."
                 technicalDetails = "\(rejected) item(s) could not be read or decoded."
                 stage = .finished
+                presentation = .failure
                 scheduleDismissal()
                 return
             }
@@ -118,7 +127,9 @@ final class ConversionManager: ObservableObject {
             selectedInputID = nil
             if rejected > 0 { message = "\(rejected) item(s) skipped. \(firstRejection ?? "")" }
             await refreshFormats()
+            guard generation == currentGeneration, presentation != .exiting else { return }
             stage = .setup
+            if presentation != .entering { presentation = .ready }
         }
     }
 
@@ -130,6 +141,7 @@ final class ConversionManager: ObservableObject {
     }
 
     private func refreshFormats() async {
+        let currentGeneration = generation
         let group = categoryInputs
         guard !group.isEmpty else { formats = []; selectedFormatID = ""; return }
         var offered: [(ConversionInput, [ConversionFormat])] = []
@@ -137,6 +149,7 @@ final class ConversionManager: ObservableObject {
         let initial = offered[0].1
         var sharedIDs = Set(initial.map(\.id))
         for (_, options) in offered.dropFirst() { sharedIDs.formIntersection(options.map(\.id)) }
+        guard generation == currentGeneration, presentation != .exiting else { return }
         if sharedIDs.isEmpty && group.count > 1 {
             if let choice = offered.first(where: { !$0.1.isEmpty }) {
                 selectedInputID = choice.0.id
@@ -179,6 +192,7 @@ final class ConversionManager: ObservableObject {
         jobs = categoryInputs.map { ConversionJob(input: $0, format: format) }
         convertedInputIDs.formUnion(jobs.map { $0.input.id })
         stage = .running
+        presentation = .converting
         let currentGeneration = generation
         runTask = Task { await runQueue(generation: currentGeneration) }
     }
@@ -197,6 +211,7 @@ final class ConversionManager: ObservableObject {
         cancelAllRequested = false
         message = nil
         stage = .running
+        presentation = .converting
         holdInteraction()
         let currentGeneration = generation
         runTask = Task { await runQueue(generation: currentGeneration) }
@@ -210,6 +225,7 @@ final class ConversionManager: ObservableObject {
         message = nil
         technicalDetails = nil
         stage = .setup
+        presentation = .ready
         Task { await refreshFormats() }
     }
 
@@ -261,8 +277,12 @@ final class ConversionManager: ObservableObject {
                         let elapsed = Date().timeIntervalSince(started)
                         let bounded = fraction.map { min(1, max(0, $0)) }
                         let remaining = bounded.flatMap { $0 > 0.02 ? elapsed * (1 - $0) / $0 : nil }
+                        let previous = self.jobs[index].progress
+                        let monotonic = bounded.map { max(previous?.fraction ?? 0, $0) }
+                        if let previous, elapsed - previous.elapsed < 0.08,
+                           abs((monotonic ?? 0) - (previous.fraction ?? 0)) < 0.025 { return }
                         self.jobs[index].progress = ConversionProgress(
-                            fraction: bounded, elapsed: elapsed, remaining: remaining)
+                            fraction: monotonic, elapsed: elapsed, remaining: remaining)
                     }
                     }
                 }
@@ -294,8 +314,13 @@ final class ConversionManager: ObservableObject {
         }
         guard generation == activeGeneration else { return }
         stage = .finished
+        presentation = (cancelAllRequested || cancelledCount > 0) && failedCount == 0 ? .cancelled
+            : failedCount > 0 ? .failure : .success
         runTask = nil
-        scheduleDismissal()
+        if closeAfterCancellation {
+            closeAfterCancellation = false
+            scheduleDismissal(after: 2)
+        } else { scheduleDismissal() }
     }
 
     private func engine(for input: ConversionInput, format: ConversionFormat) async -> (any ConversionEngine)? {
@@ -307,16 +332,32 @@ final class ConversionManager: ObservableObject {
 
     func cancelCurrent() { currentTask?.cancel() }
     func cancelAll() {
+        guard stage == .running else { return }
         cancelAllRequested = true
         currentTask?.cancel()
-        runTask?.cancel()
     }
 
     func close() {
-        cancelAll()
+        guard presentation != .exiting && presentation != .shelf else { return }
+        if stage == .running {
+            closeAfterCancellation = true
+            cancelAll()
+            return
+        }
+        dismissTask?.cancel()
+        presentation = .exiting
+    }
+
+    func entranceCompleted() {
+        if presentation == .entering { presentation = .ready }
+    }
+
+    func exitCompleted() {
+        guard presentation == .exiting else { return }
         generation = UUID()
         resetState()
         stage = .idle
+        presentation = .shelf
         releaseInteraction()
     }
 
@@ -345,10 +386,10 @@ final class ConversionManager: ObservableObject {
         SharingStateManager.shared.endInteraction()
     }
 
-    private func scheduleDismissal() {
+    private func scheduleDismissal(after seconds: Double = 10) {
         dismissTask?.cancel()
         dismissTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(10))
+            try? await Task.sleep(for: .seconds(seconds))
             guard !Task.isCancelled, !isHovered, stage == .finished else { return }
             close()
         }

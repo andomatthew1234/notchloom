@@ -12,10 +12,13 @@ struct BoringHeader: View {
     @EnvironmentObject var vm: BoringViewModel
     @ObservedObject var coordinator = BoringViewCoordinator.shared
     @StateObject var tvm = ShelfStateViewModel.shared
+    @ObservedObject private var converter = ConversionManager.shared
     @Default(.settingsIconInNotch) private var showSettings
 
     private var showsTabs: Bool {
-        coordinator.alwaysShowTabs || (!tvm.isEmpty && Defaults[.boringShelf])
+        if converter.presentation == .converting || converter.presentation == .success
+            || converter.presentation == .failure || converter.presentation == .cancelled { return false }
+        return coordinator.alwaysShowTabs || (!tvm.isEmpty && Defaults[.boringShelf])
             || coordinator.currentView == .tools || coordinator.currentView == .shelf
     }
 
@@ -38,6 +41,12 @@ struct BoringHeader: View {
                 if showsTabs {
                     TabSelectionView()
                         .offset(x: 12)
+                } else if converter.presentation == .converting || converter.presentation == .success
+                            || converter.presentation == .failure || converter.presentation == .cancelled {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.cyan)
+                        .accessibilityLabel("Convert")
                 } else {
                     Button {
                         withAnimation(.smooth) { coordinator.currentView = .tools }

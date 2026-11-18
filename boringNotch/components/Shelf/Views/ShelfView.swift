@@ -19,7 +19,7 @@ struct ShelfView: View {
 
     var body: some View {
         Group {
-            if converter.stage == .idle || converter.presentationScreenID != vm.screenUUID {
+            if converter.presentation == .shelf || converter.presentationScreenID != vm.screenUUID {
                 HStack(spacing: 10) {
                     FileShareView()
                         .frame(width: 138, height: 150)
@@ -37,11 +37,12 @@ struct ShelfView: View {
             } else {
                 ConvertPanelView()
                     .frame(height: max(190, vm.notchSize.height - max(36, vm.effectiveClosedNotchHeight) - 20))
-                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .offset(y: 12)))
+                    .opacity(converter.presentation == .exiting ? 0 : 1)
+                    .allowsHitTesting(converter.presentation != .exiting)
             }
         }
-        .animation(reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.4, dampingFraction: 0.86),
-                   value: converter.stage)
+        .animation(reduceMotion ? .easeOut(duration: 0.15) : .easeInOut(duration: 0.22),
+                   value: converter.presentation)
         // Bind Quick Look to shelf selection
         .onChange(of: selection.selectedIDs) {
             updateQuickLookSelection()
