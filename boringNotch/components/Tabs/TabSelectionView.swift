@@ -42,7 +42,7 @@ struct TabSelectionView: View {
                                 .font(.system(size: 11, weight: .semibold))
                         }
                         .foregroundStyle(coordinator.currentView == tab.view ? .white : .white.opacity(0.68))
-                        .padding(.horizontal, 7)
+                        .padding(.horizontal, 5)
                         .frame(height: 28)
                         .lineLimit(1)
                         .contentShape(Capsule())

@@ -36,11 +36,10 @@ struct BoringHeader: View {
         let sideWidth = max(0, (contentWidth - vm.closedNotchSize.width) / 2)
 
         HStack(spacing: 0) {
-            HStack(spacing: 0) {
-                Spacer(minLength: 0)
+            Group {
                 if showsTabs {
                     TabSelectionView()
-                        .offset(x: 12)
+                        .fixedSize(horizontal: true, vertical: false)
                 } else if converter.presentation == .converting || converter.presentation == .success
                             || converter.presentation == .failure || converter.presentation == .cancelled {
                     Image(systemName: "arrow.triangle.2.circlepath")
@@ -59,8 +58,11 @@ struct BoringHeader: View {
                     .help("Open Overview")
                 }
             }
-            .padding(.trailing, 4)
-            .frame(width: sideWidth, height: headerHeight)
+            // The tabs can be wider than the area beside the physical notch.
+            // Anchor their trailing edge here so any overflow goes toward the
+            // outer edge of the panel instead of over the camera cutout.
+            .padding(.trailing, 10)
+            .frame(width: sideWidth, height: headerHeight, alignment: .trailing)
 
             Rectangle()
                 .fill(NSScreen.screen(withUUID: coordinator.selectedScreenUUID)?.safeAreaInsets.top ?? 0 > 0 ? .black : .clear)
