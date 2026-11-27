@@ -12,6 +12,16 @@ import CoreGraphics
 
 class BoringNotchXPCHelper: NSObject, BoringNotchXPCHelperProtocol {
 
+    private let intelligenceRunner = IntelligenceShortcutRunner()
+
+    @objc func runIntelligenceShortcut(_ name: String, prompt: String, requestID: String, with reply: @escaping (Data) -> Void) {
+        intelligenceRunner.run(name: name, prompt: prompt, requestID: requestID, reply: reply)
+    }
+
+    @objc func cancelIntelligenceShortcut(_ requestID: String) {
+        intelligenceRunner.cancel(requestID: requestID)
+    }
+
     @objc func visibleNotificationBanners(with reply: @escaping (Data) -> Void) {
         reply(NotificationBannerReader.visibleBanners())
     }

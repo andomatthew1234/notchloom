@@ -17,6 +17,22 @@ struct NotificationPresentationTests {
         }
         func wait(_ seconds: Double) async throws { try await Task.sleep(for: .seconds(seconds)) }
 
+        var tracker = NotificationArrivalTracker()
+        let first = item("first", local: false)
+        check(tracker.arrivals(in: [first]).count == 1, "First visible notification is captured")
+        check(tracker.arrivals(in: [first]).isEmpty, "A persistent alert is mirrored once")
+        _ = tracker.arrivals(in: [])
+        check(tracker.arrivals(in: [first]).count == 1, "A repeated notification after dismissal is captured")
+        let identical = NotchNotification(id: "different-window", source: first.source, title: first.title, body: first.body)
+        check(tracker.arrivals(in: [first, identical]).map(\.id) == [identical.id],
+              "Identical text from a distinct notification is captured")
+        var cardTracker = NotificationArrivalTracker()
+        let card = NotchNotification(id: "card", source: "Clock", title: "Timer", body: "", deliveryID: "delivery-one")
+        check(cardTracker.arrivals(in: [card]).count == 1, "A real notification delivery is captured")
+        _ = cardTracker.arrivals(in: [])
+        check(cardTracker.arrivals(in: [card]).isEmpty, "Stack rearrangement does not replay a delivery")
+        let nextCard = NotchNotification(id: "next-card", source: "Clock", title: "Timer", body: "", deliveryID: "delivery-two")
+        check(cardTracker.arrivals(in: [nextCard]).count == 1, "A second identical timer delivery is captured")
         p.enqueue(item("one"))
         check(p.phase == .idle, "No alert is consumed before a notch surface exists")
         p.updateSurface("built-in", frame: frame, blocked: true)

@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>When you enable Calendar in Today, Notchloom reads upcoming event titles and times from your selected calendars. Today never changes events or reads event notes.</string>
+	<key>NSLocationUsageDescription</key>
+	<string>When you choose approximate location for Today weather, Notchloom requests a single city-level location. It does not track your location in the background.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Today can request an approximate location for local weather, only after you choose this option.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

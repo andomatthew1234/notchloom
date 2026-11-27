@@ -3,6 +3,7 @@ import SwiftUI
 
 /// Overview keeps its tools inside the open notch, with a stable bottom tab bar.
 struct NotchToolsView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var vm: BoringViewModel
     @ObservedObject private var focus = FocusTimerManager.shared
     @ObservedObject private var apps = QuickAppsManager.shared
@@ -17,11 +18,15 @@ struct NotchToolsView: View {
     @Default(.showBatteryIndicator) private var showBattery
     @State private var panel: OverviewPanel = .dashboard
     @State private var isHoveringArtwork = false
+    @State private var isHoveringIntelligence = false
+    @Namespace private var todayExpansion
+    @ObservedObject private var todayData = TodayAppData.controller
 
     private enum OverviewPanel: Equatable {
         case dashboard
         case calendar
         case focus
+        case power
         case mirror
     }
 
@@ -31,34 +36,53 @@ struct NotchToolsView: View {
     }
 
     var body: some View {
+        ZStack(alignment: .top) {
+            if vm.todayExpanded {
+                TodayDataPageHost(controller: todayData, expansionNamespace: reduceMotion ? nil : todayExpansion,
+                                  onBack: returnToDashboard, onClose: closeToday, onSources: {
+                    closeToday()
+                    SettingsWindowController.shared.showTodaySources()
+                }, briefings: TodayAppData.briefings, onModels: {
+                    closeToday()
+                    SettingsWindowController.shared.showIntelligenceModels()
+                }, prepareLocationPermission: { await vm.prepareTodayLocationPermission(reduceMotion: reduceMotion) })
+                .frame(width: max(0, vm.todayNotchSize.width - 2 * ((Defaults[.cornerRadiusScaling] ? cornerRadiusInsets.opened.top : cornerRadiusInsets.opened.bottom) + 12)),
+                       height: max(0, vm.todayNotchSize.height - TodayPageGeometry.chromeHeight(closedNotchHeight: vm.effectiveClosedNotchHeight)), alignment: .top)
+                .onPreferenceChange(TodayPreferredContentHeightKey.self) { height in
+                    vm.updateTodayContentHeight(height, reduceMotion: reduceMotion)
+                }
+                .background(TodayNotchInteraction(containsScreenPoint: { vm.isMouseHovering(position: $0) }, onClose: closeToday,
+                                                 canDismissOutside: { !todayData.requestingPermission }, suspended: vm.todayPermissionWaiting))
+                .opacity(vm.todayPermissionWaiting ? 0 : 1)
+                .allowsHitTesting(!vm.todayPermissionWaiting)
+                .accessibilityHidden(vm.todayPermissionWaiting)
+                .frame(width: vm.todayPermissionWaiting ? 0 : nil, height: vm.todayPermissionWaiting ? 0 : nil)
+                .clipped()
+                .transition(.identity)
+                .zIndex(1)
+            } else { overviewContent.transition(.opacity.animation(.easeOut(duration: 0.08))) }
+        }
+        .onPreferenceChange(PowerContentHeightKey.self) { height in
+            vm.updatePowerContentHeight(height, reduceMotion: reduceMotion)
+        }
+        .onDisappear {
+            stopMirror()
+            vm.setPowerExpanded(false)
+        }
+        .onChange(of: todayData.locationPermissionHandoff) { _, pending in
+            if !pending { vm.restoreTodayAfterLocationPermission(reduceMotion: reduceMotion) }
+        }
+    }
+
+    private var overviewContent: some View {
         VStack(spacing: 8) {
             panelContent
-                .frame(height: 132, alignment: .top)
+                .frame(height: panel == .power ? vm.powerContentHeight : 132, alignment: .top)
                 .frame(maxWidth: .infinity)
 
-            HStack(spacing: 5) {
-                panelButton("Dashboard", icon: "square.grid.2x2.fill", for: .dashboard)
-                panelButton("Calendar", icon: "calendar", for: .calendar)
-                panelButton("Focus Timer", icon: "timer", for: .focus)
-                if showMirror {
-                    panelButton("Mirror", icon: "web.camera", for: .mirror)
-                }
-
-                Spacer(minLength: 0)
-                if showBattery {
-                    BoringBatteryView(
-                        batteryWidth: 30,
-                        isCharging: battery.isCharging,
-                        isInLowPowerMode: battery.isInLowPowerMode,
-                        isPluggedIn: battery.isPluggedIn,
-                        levelBattery: battery.levelBattery,
-                        maxCapacity: battery.maxCapacity,
-                        timeToFullCharge: battery.timeToFullCharge,
-                        isForNotification: false
-                    )
-                    .frame(width: 30, height: 28)
-                    .help("Battery in Overview")
-                }
+            ViewThatFits(in: .horizontal) {
+                overviewTabs.labelStyle(.titleAndIcon)
+                overviewTabs.labelStyle(.titleOnly)
             }
             .font(.system(size: 11, weight: .semibold))
             .frame(height: 29)
@@ -83,30 +107,117 @@ struct NotchToolsView: View {
                 vm.toggleCameraPreview()
             }
         }
-        .onDisappear { stopMirror() }
+    }
+
+    private var overviewTabs: some View {
+        HStack(spacing: 3) {
+                panelButton("Dashboard", icon: "square.grid.2x2.fill", for: .dashboard)
+                panelButton("Calendar", icon: "calendar", for: .calendar)
+                panelButton("Focus Timer", icon: "timer", for: .focus)
+                if showMirror {
+                    panelButton("Mirror", icon: "web.camera", for: .mirror)
+                }
+
+                panelButton("Power usage", icon: "bolt.fill", for: .power)
+                Spacer(minLength: 0)
+                if showBattery {
+                    BoringBatteryView(
+                        batteryWidth: 30,
+                        isCharging: battery.isCharging,
+                        isInLowPowerMode: battery.isInLowPowerMode,
+                        isPluggedIn: battery.isPluggedIn,
+                        levelBattery: battery.levelBattery,
+                        maxCapacity: battery.maxCapacity,
+                        timeToFullCharge: battery.timeToFullCharge,
+                        isForNotification: false
+                    )
+                    .frame(width: 30, height: 28)
+                    .help("Battery in Overview")
+                }
+                intelligenceButton
+            }
+    }
+
+    private func openToday() {
+        withAnimation(reduceMotion ? .easeOut(duration: 0.14) : .spring(response: 0.46, dampingFraction: 0.91)) {
+            vm.setTodayExpanded(true)
+        }
+    }
+
+    private var intelligenceButton: some View {
+        Button {
+            stopMirror()
+            IntelligenceCoordinator.shared.activate(on: vm)
+        } label: {
+            Label("Intelligence", systemImage: "sparkles")
+                .padding(.horizontal, 11)
+                .frame(height: 27)
+                .background(.white.opacity(isHoveringIntelligence ? 0.10 : 0.035), in: Capsule())
+                .overlay {
+                    Capsule().strokeBorder(
+                        AngularGradient(colors: [.red, .orange, .yellow, .green, .cyan, .blue, .purple, .pink, .red], center: .center),
+                        lineWidth: isHoveringIntelligence ? 1.5 : 1.15
+                    )
+                }
+                .contentShape(Capsule())
+        }
+        .foregroundStyle(.white.opacity(0.95))
+        .fixedSize()
+        .buttonStyle(TodayInvitationButtonStyle())
+        .shadow(color: .purple.opacity(isHoveringIntelligence ? 0.20 : 0), radius: 7)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: isHoveringIntelligence)
+        .onHover { isHoveringIntelligence = $0 }
+        .help("Open Notchloom Intelligence")
+        .accessibilityLabel("Open Intelligence")
+    }
+    private func returnToDashboard() {
+        withAnimation(reduceMotion ? .easeOut(duration: 0.14) : .spring(response: 0.42, dampingFraction: 0.95), completionCriteria: .logicallyComplete) {
+            panel = .dashboard
+            vm.setTodayExpanded(false)
+        } completion: { vm.finishTodayContraction() }
+    }
+    private func closeToday() {
+        withAnimation(reduceMotion ? .easeOut(duration: 0.14) : .spring(response: 0.42, dampingFraction: 1)) { vm.close() }
     }
 
     @ViewBuilder
     private var panelContent: some View {
         switch panel {
         case .dashboard:
-            HStack(spacing: 10) {
-                nowPlayingSlot
-                if focus.phase == .running {
-                    focusDashboardCard
-                        .transition(.opacity.combined(with: .scale(scale: 0.94)))
+            GeometryReader { geometry in
+                let occupiedWidths: [CGFloat] = (showsOverviewArtwork ? [112] : [])
+                    + (focus.phase == .running ? [136] : [])
+                    + (shelfEnabled && !shelf.isEmpty ? [150] : []) + [230]
+                let plan = DashboardSlotPlan(availableWidth: geometry.size.width, occupiedWidths: occupiedWidths)
+                HStack(spacing: plan.gap) {
+                    if showsOverviewArtwork { nowPlayingSlot }
+                    if plan.slots > 0 {
+                        Button(action: openToday) {
+                            TodayWidget(slots: plan.slots,
+                                        content: TodayContextPresentation.dashboardContent(todayData.localDate),
+                                        expansionNamespace: reduceMotion ? nil : todayExpansion, isPreview: false)
+                        }
+                            .buttonStyle(TodayInvitationButtonStyle())
+                            .frame(width: plan.width)
+                            .transition(.opacity)
+                            .accessibilityLabel("Open Today")
+                    }
+                    if focus.phase == .running {
+                        focusDashboardCard
+                            .transition(.opacity.combined(with: .scale(scale: 0.94)))
+                    }
+                    if shelfEnabled && !shelf.isEmpty {
+                        shelfDashboardCard
+                            .transition(.opacity.combined(with: .scale(scale: 0.94)))
+                    }
+                    appsSection.frame(width: 230, alignment: .topLeading)
                 }
-                if shelfEnabled && !shelf.isEmpty {
-                    shelfDashboardCard
-                        .transition(.opacity.combined(with: .scale(scale: 0.94)))
-                }
-                Spacer(minLength: 0)
-                appsSection.frame(width: 230, alignment: .topLeading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(height: 112, alignment: .top)
+                .animation(reduceMotion ? nil : .smooth(duration: 0.4), value: occupiedWidths)
+                .animation(reduceMotion ? nil : .smooth(duration: 0.4), value: plan.slots)
             }
             .padding(.horizontal, 18)
-            .animation(.smooth(duration: 0.25), value: focus.phase)
-            .animation(.smooth(duration: 0.25), value: shelf.items.count)
-            .animation(.smooth(duration: 0.25), value: shelfEnabled)
         case .calendar:
             if showCalendar {
                 CalendarView()
@@ -125,6 +236,8 @@ struct NotchToolsView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+        case .power:
+            PowerUsageView()
         case .focus:
             focusSection
                 .frame(maxWidth: 570)
@@ -152,14 +265,18 @@ struct NotchToolsView: View {
         Button {
             if panel == .mirror && target != .mirror { stopMirror() }
             if target == .mirror && panel != .mirror { vm.toggleCameraPreview() }
-            withAnimation(.snappy(duration: 0.25, extraBounce: 0)) { panel = target }
+            withAnimation(reduceMotion ? .easeOut(duration: 0.14) : .snappy(duration: 0.25, extraBounce: 0)) {
+                panel = target
+                vm.setPowerExpanded(target == .power)
+            }
         } label: {
             Label(title, systemImage: icon)
-                .padding(.horizontal, 10)
+                .padding(.horizontal, 8)
                 .frame(height: 27)
                 .background(panel == target ? .white.opacity(0.16) : .clear, in: Capsule())
                 .contentShape(Capsule())
         }
+        .fixedSize()
         .foregroundStyle(panel == target ? .white : .white.opacity(0.62))
         .accessibilityAddTraits(panel == target ? .isSelected : [])
     }

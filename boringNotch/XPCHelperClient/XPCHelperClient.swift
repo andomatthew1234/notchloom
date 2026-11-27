@@ -11,6 +11,11 @@ final class XPCHelperClient: NSObject {
     private var connection: NSXPCConnection?
     private var lastKnownAuthorization: Bool?
     private var monitoringTask: Task<Void, Never>?
+
+    private struct ShortcutReply: Decodable {
+        let response: String?
+        let error: String?
+    }
     
     deinit {
         connection?.invalidate()
@@ -254,6 +259,37 @@ final class XPCHelperClient: NSObject {
             return false
         }
     }
+
+    nonisolated func runIntelligenceShortcut(name: String, prompt: String) async throws -> String {
+        let requestID = UUID().uuidString
+        let service = await MainActor.run { ensureRemoteService() }
+        return try await withTaskCancellationHandler {
+            let data: Data = try await service.withContinuation { remote, continuation in
+                remote.runIntelligenceShortcut(name, prompt: prompt, requestID: requestID) { result in
+                    continuation.resume(returning: result)
+                }
+            }
+            try Task.checkCancellation()
+            let result = try JSONDecoder().decode(ShortcutReply.self, from: data)
+            if let error = result.error { throw IntelligenceShortcutError(error) }
+            guard let response = result.response, !response.isEmpty else {
+                throw IntelligenceShortcutError("The Shortcut returned no text.")
+            }
+            return response
+        } onCancel: {
+            Task {
+                try? await service.withService { remote in
+                    remote.cancelIntelligenceShortcut(requestID)
+                }
+            }
+        }
+    }
+}
+
+private struct IntelligenceShortcutError: LocalizedError {
+    let message: String
+    init(_ message: String) { self.message = message }
+    var errorDescription: String? { message }
 }
 
 extension Notification.Name {

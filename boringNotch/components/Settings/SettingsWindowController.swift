@@ -92,6 +92,15 @@ class SettingsWindowController: NSWindowController {
             self?.window?.makeKeyAndOrderFront(nil)
         }
     }
+
+    func showTodaySources() {
+        showWindow()
+        NotificationCenter.default.post(name: .todaySettingsRequested, object: nil)
+    }
+    func showIntelligenceModels() {
+        showWindow()
+        NotificationCenter.default.post(name: .todayModelsSettingsRequested, object: nil)
+    }
     
     override func close() {
         super.close()

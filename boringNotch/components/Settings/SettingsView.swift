@@ -58,13 +58,15 @@ private struct NotchloomSettingsHeader: View {
 }
 
 private enum SettingsCategory: String {
-    case general, appearance, notchContent, app
+    case general, appearance, notchContent, intelligence, today, app
 
     var title: String {
         switch self {
         case .general: "General"
         case .appearance: "Appearance"
         case .notchContent: "Choose what shows in the notch"
+        case .intelligence: "Intelligence"
+        case .today: "Today"
         case .app: "App"
         }
     }
@@ -74,6 +76,8 @@ private enum SettingsCategory: String {
         case .general: "gearshape"
         case .appearance: "paintbrush.pointed"
         case .notchContent: "rectangle.topthird.inset.filled"
+        case .intelligence: "sparkle"
+        case .today: "sun.horizon"
         case .app: "app"
         }
     }
@@ -83,6 +87,8 @@ private enum SettingsCategory: String {
         case .general: "General"
         case .appearance: "Appearance"
         case .notchContent: "QuickApps"
+        case .intelligence: "Models"
+        case .today: "TodaySources"
         case .app: "Shortcuts"
         }
     }
@@ -101,6 +107,7 @@ struct SettingsView: View {
 
     private var pageInfo: (title: String, description: String, symbol: String) {
         switch selectedTab {
+        case "TodaySources": return ("Data sources", "Choose what Today collects. Inspect it locally, with no Gemini transmission.", "sun.horizon")
         case "General": return ("General", "Choose where Notchloom appears and how it opens.", "gearshape")
         case "Appearance": return ("Appearance", "Adjust the look of the notch and music player.", "paintbrush.pointed")
         case "Media": return ("Now playing", "Pick your music source, controls, and playback behavior.", "music.note")
@@ -111,6 +118,7 @@ struct SettingsView: View {
         case "HUD": return ("Volume, battery & system HUDs", "Choose how system changes appear around the notch.", "slider.horizontal.3")
         case "Battery": return ("Battery notch widget", "Show your Mac’s battery in Overview and choose its details.", "battery.100.bolt")
         case "Shelf": return ("File shelf", "Keep files handy and choose how to share them.", "square.stack.3d.up")
+        case "Models": return ("Models", "Connect a model and open Intelligence from anywhere.", "sparkle")
         case "Shortcuts": return ("Shortcuts", "Set keyboard shortcuts for quick actions.", "keyboard")
         case "Advanced": return ("Advanced", "Fine-tune colors, windows, and display behavior.", "gearshape.2")
         default: return ("About", "Version, updates, and project information.", "info.circle")
@@ -151,6 +159,14 @@ struct SettingsView: View {
                     pageRow("Notifications", title: "Notifications", symbol: "bell.badge")
                     pageRow("Calendar", title: "Calendar", symbol: "calendar")
                     pageRow("Shelf", title: "File shelf", symbol: "square.stack.3d.up")
+                }
+                categoryRow(.intelligence)
+                if expandedCategory == .intelligence {
+                    pageRow("Models", title: "Models", symbol: "sparkle")
+                }
+                categoryRow(.today)
+                if expandedCategory == .today {
+                    pageRow("TodaySources", title: "Data sources", symbol: "square.stack.3d.up")
                 }
                 categoryRow(.app)
                 if expandedCategory == .app {
@@ -202,6 +218,10 @@ struct SettingsView: View {
                     BatteryNotchSettings()
                 case "Shelf":
                     Shelf()
+                case "Models":
+                    IntelligenceSettingsView()
+                case "TodaySources":
+                    TodayDataSettingsView(controller: TodayAppData.controller, briefings: TodayAppData.briefings)
                 case "Shortcuts":
                     Shortcuts()
                 case "Advanced":
@@ -234,6 +254,12 @@ struct SettingsView: View {
         .accentColor(NotchloomTheme.cyan)
         .preferredColorScheme(.dark)
         .id(accentColorUpdateTrigger)
+        .onReceive(NotificationCenter.default.publisher(for: .todaySettingsRequested)) { _ in
+            expandedCategory = .today; selectedTab = "TodaySources"
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .todayModelsSettingsRequested)) { _ in
+            expandedCategory = .intelligence; selectedTab = "Models"
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("AccentColorChanged"))) { _ in
             accentColorUpdateTrigger = UUID()
         }
@@ -915,6 +941,7 @@ struct QuickAppsSettings: View {
 
 struct NotificationsSettings: View {
     @Default(.showNotificationBanners) private var showNotificationBanners
+    @ObservedObject private var notificationMirror = NotificationMirror.shared
     @State private var accessibilityGranted = false
 
     var body: some View {
@@ -931,6 +958,9 @@ struct NotificationsSettings: View {
 
             if showNotificationBanners {
                 Section {
+                    Label(notificationMirror.captureStatus.rawValue,
+                          systemImage: notificationMirror.captureStatus == .ready ? "checkmark.circle" : "info.circle")
+                        .foregroundStyle(notificationMirror.captureStatus == .ready ? Color.secondary : Color.orange)
                     HStack(spacing: 12) {
                         Button("Preview in the notch") {
                             NotificationMirror.shared.preview()

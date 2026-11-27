@@ -35,7 +35,45 @@ class BoringNotchSkyLightWindow: NSPanel {
     private var isSkyLightEnabled: Bool = false
     /// Enabled only while the user is typing in Convert's format search.
     var allowsConverterKeyboardFocus = false
+    var allowsIntelligenceKeyboardFocus = false
+    var allowsTodayKeyboardFocus = false
     
+    // SwiftUI reports this in the top-leading coordinate space of the host.
+    var pointerRegion = CGRect.zero { didSet { updatePointerRouting() } }
+    var suspendsPointerInput = false { didSet { updatePointerRouting() } }
+    private var pointerMonitors: [Any] = []
+
+    private func updatePointerRouting() {
+        let mouse = NSEvent.mouseLocation
+        let local = CGPoint(x: mouse.x - frame.minX, y: frame.maxY - mouse.y)
+        let passThrough = suspendsPointerInput || !pointerRegion.contains(local)
+        if ignoresMouseEvents != passThrough { ignoresMouseEvents = passThrough }
+    }
+
+    // WindowServer chooses the receiving process before SwiftUI hit testing.
+    // Observe motion so the transparent host yields to the window beneath it.
+    private func observePointer() {
+        ignoresMouseEvents = true
+        let mask: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .rightMouseDragged, .leftMouseUp]
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: mask, handler: { [weak self] _ in
+            self?.updatePointerRouting()
+        }) { pointerMonitors.append(global) }
+        if let local = NSEvent.addLocalMonitorForEvents(matching: mask, handler: { [weak self] event in
+            // A drag that started inside the notch owns its events until release.
+            if event.type != .leftMouseDragged || event.window !== self { self?.updatePointerRouting() }
+            return event
+        }) { pointerMonitors.append(local) }
+        NotificationCenter.default.publisher(for: NSWindow.didMoveNotification, object: self)
+            .sink { [weak self] _ in self?.updatePointerRouting() }
+            .store(in: &observers)
+    }
+
+    override func close() {
+        pointerMonitors.forEach(NSEvent.removeMonitor)
+        pointerMonitors.removeAll()
+        super.close()
+    }
+
     override init(
         contentRect: NSRect,
         styleMask: NSWindow.StyleMask,
@@ -51,6 +89,7 @@ class BoringNotchSkyLightWindow: NSPanel {
         
         configureWindow()
         setupObservers()
+        observePointer()
     }
     
     private func configureWindow() {
@@ -111,6 +150,6 @@ class BoringNotchSkyLightWindow: NSPanel {
     
     private var observers: Set<AnyCancellable> = []
     
-    override var canBecomeKey: Bool { allowsConverterKeyboardFocus }
+    override var canBecomeKey: Bool { allowsConverterKeyboardFocus || allowsIntelligenceKeyboardFocus || allowsTodayKeyboardFocus }
     override var canBecomeMain: Bool { false }
 }

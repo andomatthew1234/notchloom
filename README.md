@@ -36,11 +36,15 @@ Notchloom is a macOS notch utility built from [Boring Notch](https://github.com/
 
 The main controls remain customizable. Notchloom's starting choices reflect this fork's preferred setup; they do not lock anyone into it.
 
-## Install status
+## Download
 
-**There is no public signed and notarized Notchloom download yet.** The themed DMG has been built and tested locally, but the app currently uses an Apple Development signature. The original project's download and Homebrew links install **Boring Notch**, not this fork.
+[Visit the Notchloom website](https://notchloom.controllagy.chatgpt.site/) to watch the film and explore the features.
 
-You can [build Notchloom from source](#build-from-source). A public installer is pending distribution signing and notarization.
+[Download Notchloom 2.8.19 preview](https://github.com/andomatthew1234/notchloom/releases/tag/v2.8.19-preview). The themed DMG contains an **Apple Silicon** build with a **macOS 14.0** deployment target. It has been tested on the developer's Apple Silicon Mac running macOS 26; other versions and hardware are unverified. Individual features can require newer macOS capabilities or a configured provider.
+
+**This preview is Apple Development signed, not Developer ID signed or notarized. macOS may block it from opening.** A normally trusted public installer is pending distribution signing and notarization. No Gatekeeper bypass or system-security change is included in the installer. The release includes SHA-256 checksums and its matching source tag. See [release details](docs/releases/2.8.19-preview.md).
+
+You can also [build Notchloom from source](#build-from-source). The original project's download and Homebrew links install **Boring Notch**, not this fork.
 
 ## Defaults on a fresh install
 
@@ -56,9 +60,11 @@ You can [build Notchloom from source](#build-from-source). A public installer is
 
 Existing preferences stay in place when upgrading. Permissions, completed onboarding, and device-specific display IDs are never copied from the maintainer's Mac. Camera access is needed for the mirror; Accessibility access is needed for HUD replacement, media-key interception, and visible notification banners. Notchloom does not read notification history or bypass hidden previews.
 
+Today can prepare a Gemini briefing from your chosen local sources after separate Google-processing consent. Open Today to set up sources, inspect the outgoing context and allow generation. Save your key and choose the Today model under Settings → Intelligence → Models. Connection tests are optional. Reports use verified native card references, encrypted local caching and a manual Refresh action. Scheduled Today Moments are not implemented. See the [Phase 4 implementation and verification report](docs/today-phase-four.md).
+
 ## Build from source
 
-You need macOS 15.6 or later and Xcode 26 or later.
+You need Xcode 26 or later on a supported macOS version. The app's deployment target is macOS 14.0.
 
 ```bash
 git clone https://github.com/andomatthew1234/notchloom.git
@@ -80,7 +86,7 @@ The script uses a pinned `dmgbuild` version and writes `dist/Notchloom-<version>
 
 ## Updates, credits, and license
 
-The [Notchloom appcast](appcast.xml) is empty until the first public binary release. Update checks point to this fork, so Notchloom will not install an upstream Boring Notch build.
+The [Notchloom appcast](appcast.xml) remains empty until distribution signing and updater verification are ready. The public preview is a manual download and is not advertised through automatic updates. Update checks point to this fork, so Notchloom will not install an upstream Boring Notch build.
 
 Notchloom is based on [Boring Notch by TheBoredTeam](https://github.com/TheBoredTeam/boring.notch). The original README is preserved in [docs/UPSTREAM_README.md](docs/UPSTREAM_README.md). This fork keeps the project's [GNU GPLv3 license](LICENSE). The Notchloom icon was generated for this fork and prepared as a macOS app icon.
 

@@ -29,6 +29,8 @@ DerivedData/
 # Build output
 build/
 dist/
+# The website is a separate Sites source repository.
+/website/
 *.app
 *.dSYM
 

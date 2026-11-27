@@ -26,6 +26,7 @@ struct ContentView: View {
     @ObservedObject var volumeManager = VolumeManager.shared
     @ObservedObject private var notificationMirror = NotificationMirror.shared
     @ObservedObject private var converter = ConversionManager.shared
+    @ObservedObject private var intelligence = IntelligenceCoordinator.shared
     @State private var hoverTask: Task<Void, Never>?
     @State private var isHovering: Bool = false
     @State private var anyDropDebounceTask: Task<Void, Never>?
@@ -114,6 +115,9 @@ struct ContentView: View {
                         : cornerRadiusInsets.closed.bottom
                     )
                     .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
+                    .conditionalModifier(intelligence.isActive && intelligence.presentationScreenID == vm.screenUUID) { view in
+                        view.frame(width: vm.notchSize.width, height: vm.notchSize.height, alignment: .top)
+                    }
                     .modifier(NotificationNotchSurface(
                         presentation: notificationMirror,
                         screenID: notificationScreenID,
@@ -124,13 +128,36 @@ struct ContentView: View {
                         normalShadow: (vm.notchState == .open || isHovering) && Defaults[.enableShadow],
                         normalShadowRadius: Defaults[.cornerRadiusScaling] ? 6 : 4
                     ))
+                    .overlay {
+                        if intelligence.state == .generating && intelligence.presentationScreenID == vm.screenUUID {
+                            IntelligencePerimeterGlow(shape: currentNotchShape)
+                                .transition(.opacity)
+                        }
+                    }
+                    .overlay(alignment: .bottomTrailing) {
+                        if vm.notchState == .closed && (intelligence.isBackgroundGenerating || intelligence.hasBackgroundResult) {
+                            Button {
+                                hoverTask?.cancel()
+                                intelligence.activate(on: vm)
+                            } label: {
+                                Image(systemName: intelligence.isBackgroundGenerating ? "sparkles" : "checkmark")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(intelligence.isBackgroundGenerating ? .cyan : .white)
+                                    .frame(width: 21, height: 21)
+                                    .background(.black, in: Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.trailing, 6)
+                            .accessibilityLabel(intelligence.isBackgroundGenerating ? "Intelligence is generating. Open status" : "Intelligence response ready. Open response")
+                        }
+                    }
                     .padding(
                         .bottom,
                         vm.effectiveClosedNotchHeight == 0 ? 10 : 0
                     )
                 
                 mainLayout
-                    .frame(height: vm.notchState == .open ? vm.notchSize.height : nil)
+                    .frame(height: vm.notchState == .open ? vm.notchSize.height : nil, alignment: .top)
                     .conditionalModifier(true) { view in
                         let openAnimation = Animation.spring(response: 0.42, dampingFraction: 0.8, blendDuration: 0)
                         let closeAnimation = Animation.spring(response: 0.45, dampingFraction: 1.0, blendDuration: 0)
@@ -139,16 +166,31 @@ struct ContentView: View {
                             .animation(vm.notchState == .open ? openAnimation : closeAnimation, value: vm.notchState)
                             .animation(.smooth, value: gestureProgress)
                     }
+                    // Match the closed Shelf drop target to the notch. The
+                    // transparent animation window extends over other apps.
+                    .onGeometryChange(for: CGRect.self) { geometry in
+                        geometry.frame(in: .named("notchHost"))
+                    } action: { rect in
+                        (vm.hostWindow as? BoringNotchSkyLightWindow)?.pointerRegion = rect
+                    }
+                    .background(dragDetector)
                     .contentShape(Rectangle())
                     .onHover { hovering in
                         handleHover(hovering)
                     }
                     .onTapGesture {
-                        if notificationMirror.current == nil { doOpen() }
+                        if !vm.todayExpanded && !intelligence.isActive && notificationMirror.current == nil && converter.presentation != .permissionWaiting {
+                            if intelligence.isBackgroundGenerating || intelligence.hasBackgroundResult {
+                                intelligence.activate(on: vm)
+                            } else {
+                                doOpen()
+                            }
+                        }
                     }
                     .background(HorizontalTabSwipeMonitor { direction in
                         guard Defaults[.enableGestures], vm.notchState == .open,
-                              notificationMirror.current == nil else { return }
+                              converter.presentation != .permissionWaiting,
+                              notificationMirror.current == nil, !intelligence.isActive, !vm.todayExpanded else { return }
                         let next: NotchViews
                         switch (direction, coordinator.currentView) {
                         case (.left, .home): next = .tools
@@ -164,17 +206,18 @@ struct ContentView: View {
                     })
                     .conditionalModifier(Defaults[.enableGestures]) { view in
                         view
-                            .panGesture(direction: .down) { translation, phase in
+                            .panGesture(direction: .down, enabled: !vm.todayExpanded) { translation, phase in
                                 handleDownGesture(translation: translation, phase: phase)
                             }
                     }
                     .conditionalModifier(Defaults[.closeGestureEnabled] && Defaults[.enableGestures]) { view in
                         view
-                            .panGesture(direction: .up) { translation, phase in
+                            .panGesture(direction: .up, enabled: !vm.todayExpanded) { translation, phase in
                                 handleUpGesture(translation: translation, phase: phase)
                             }
                     }
                     .onReceive(NotificationCenter.default.publisher(for: .sharingDidFinish)) { _ in
+                        guard !vm.todayExpanded else { return }
                         if vm.notchState == .open && !isHovering && !vm.isBatteryPopoverActive {
                             hoverTask?.cancel()
                             hoverTask = Task {
@@ -196,6 +239,7 @@ struct ContentView: View {
                         }
                     }
                     .onChange(of: vm.isBatteryPopoverActive) {
+                        guard !vm.todayExpanded else { return }
                         if !vm.isBatteryPopoverActive && !isHovering && vm.notchState == .open && !SharingStateManager.shared.preventNotchClose {
                             hoverTask?.cancel()
                             hoverTask = Task {
@@ -211,7 +255,13 @@ struct ContentView: View {
                     }
                     .sensoryFeedback(.alignment, trigger: haptics)
                     .contextMenu {
+                        Button("Open Intelligence", systemImage: "sparkle") {
+                            guard !intelligence.isActive, !converter.presentation.isExpanded else { return }
+                            hoverTask?.cancel()
+                            IntelligenceCoordinator.shared.activate(on: vm)
+                        }
                         Button("Settings") {
+                            if vm.todayExpanded { withAnimation(.easeOut(duration: 0.2)) { vm.close() } }
                             DispatchQueue.main.async {
                                 SettingsWindowController.shared.showWindow()
                             }
@@ -232,6 +282,7 @@ struct ContentView: View {
         }
         .padding(.bottom, 8)
         .frame(width: vm.windowContentSize.width, height: vm.windowContentSize.height, alignment: .top)
+        .coordinateSpace(name: "notchHost")
         .compositingGroup()
         .scaleEffect(
             x: gestureScale,
@@ -239,7 +290,6 @@ struct ContentView: View {
             anchor: .top
         )
         .animation(.smooth, value: gestureProgress)
-        .background(dragDetector)
         .preferredColorScheme(.dark)
         .environmentObject(vm)
         .onChange(of: notificationMirror.current?.id) { _, id in
@@ -274,10 +324,32 @@ struct ContentView: View {
             }
         }
         .onChange(of: converter.presentation) { _, _ in updateConverterPresentation() }
-        .onChange(of: coordinator.currentView) { _, _ in updateConverterPresentation() }
+        .onChange(of: coordinator.currentView) { _, next in
+            if next != .tools && vm.powerExpanded {
+                withAnimation(reduceMotion ? .easeOut(duration: 0.14) : .snappy(duration: 0.25)) { vm.setPowerExpanded(false) }
+            }
+            if next != .tools && vm.todayExpanded {
+                withAnimation(reduceMotion ? .easeOut(duration: 0.14) : .spring(response: 0.42, dampingFraction: 0.95), completionCriteria: .logicallyComplete) {
+                    vm.setTodayExpanded(false)
+                } completion: { vm.finishTodayContraction() }
+            }
+            updateConverterPresentation()
+        }
         .onChange(of: converter.presentationScreenID) { _, _ in updateConverterPresentation() }
-        .onChange(of: vm.screenUUID) { _, _ in updateConverterPresentation() }
+        .onChange(of: vm.screenUUID) { _, _ in vm.refreshTodayLayout(); vm.refreshPowerLayout(reduceMotion: reduceMotion); updateConverterPresentation() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in vm.refreshTodayLayout(); vm.refreshPowerLayout(reduceMotion: reduceMotion) }
         .onAppear { updateConverterPresentation() }
+        .onChange(of: vm.todayExpanded) { _, opened in
+            if opened {
+                hoverTask?.cancel()
+                anyDropDebounceTask?.cancel()
+                gestureProgress = .zero
+            }
+        }
+        .onChange(of: vm.todayPermissionWaiting) { _, waiting in
+            hoverTask?.cancel()
+            (vm.hostWindow as? BoringNotchSkyLightWindow)?.suspendsPointerInput = waiting || converter.presentation == .permissionWaiting
+        }
     }
 
     private func updateConverterPresentation() {
@@ -285,10 +357,11 @@ struct ContentView: View {
         let expanded = converter.presentation.isExpanded && coordinator.currentView == .shelf
             && ownsPresentation
         let compact = [.converting, .success, .failure, .cancelled].contains(converter.presentation)
+        let permissionWaiting = converter.presentation == .permissionWaiting
         let presentation = converter.presentation
         withAnimation(reduceMotion ? .easeOut(duration: 0.15) :
                 .spring(response: 0.42, dampingFraction: 0.9), completionCriteria: .logicallyComplete) {
-            vm.setConversionExpanded(expanded, compact: compact)
+            vm.setConversionExpanded(expanded, compact: compact, permissionWaiting: permissionWaiting)
         } completion: {
             if presentation == .entering && ownsPresentation { converter.entranceCompleted() }
             if presentation == .exiting && ownsPresentation {
@@ -296,13 +369,19 @@ struct ContentView: View {
                 converter.exitCompleted()
             }
         }
+        // The host stays large enough to render the contracting surface. Its
+        // transparent remainder must not take clicks from the native panel.
+        (vm.hostWindow as? BoringNotchSkyLightWindow)?.suspendsPointerInput = permissionWaiting || vm.todayPermissionWaiting
     }
 
     @ViewBuilder
     func NotchLayout() -> some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 8) {
             VStack(alignment: .leading) {
-                if coordinator.helloAnimationRunning {
+                if intelligence.isActive && intelligence.presentationScreenID == vm.screenUUID {
+                    IntelligencePanelView()
+                        .frame(width: max(300, vm.notchSize.width - 52), height: max(44, vm.notchSize.height - 22))
+                } else if coordinator.helloAnimationRunning {
                     Spacer()
                     HelloAnimation(onFinish: {
                         vm.closeHello()
@@ -348,6 +427,10 @@ struct ContentView: View {
                               .frame(alignment: .center)
                       } else if !coordinator.expandingView.show && vm.notchState == .closed && (!musicManager.isPlaying && musicManager.isPlayerIdle) && Defaults[.showNotHumanFace] && !vm.hideOnClosed  {
                           BoringFaceAnimation()
+                       } else if vm.notchState == .open && vm.todayPermissionWaiting {
+                           Color.clear.frame(height: 0)
+                       } else if vm.notchState == .open && converter.presentation == .permissionWaiting {
+                           Color.clear.frame(height: max(24, min(30, vm.effectiveClosedNotchHeight)))
                        } else if vm.notchState == .open {
                            BoringHeader()
                                .frame(height: max(36, vm.effectiveClosedNotchHeight))
@@ -398,7 +481,7 @@ struct ContentView: View {
                       .fixedSize()
               }
               .zIndex(2)
-            if vm.notchState == .open {
+            if vm.notchState == .open && !(intelligence.isActive && intelligence.presentationScreenID == vm.screenUUID) {
                 VStack {
                     switch coordinator.currentView {
                     case .home:
@@ -420,6 +503,11 @@ struct ContentView: View {
                 .allowsHitTesting(vm.notchState == .open)
                 .opacity(gestureProgress != 0 ? 1.0 - min(abs(gestureProgress) * 0.1, 0.3) : 1.0)
             }
+        }
+        .frame(width: vm.todayPermissionWaiting ? max(0, vm.notchSize.width - 2 * ((Defaults[.cornerRadiusScaling] ? cornerRadiusInsets.opened.top : cornerRadiusInsets.opened.bottom) + 12)) : nil,
+               height: vm.todayPermissionWaiting ? max(0, vm.notchSize.height - 12) : nil, alignment: .top)
+        .overlay(alignment: .top) {
+            if vm.todayPermissionWaiting { TodayLocationPermissionNotice().padding(.top, TodayLocationPermissionGeometry.hintTop(closedHeight: vm.effectiveClosedNotchHeight)).transition(.opacity) }
         }
         .onDrop(of: [.fileURL, .url, .utf8PlainText, .plainText, .data], delegate: GeneralDropTargetDelegate(isTargeted: $vm.generalDropTargeting))
     }
@@ -571,6 +659,8 @@ struct ContentView: View {
     // MARK: - Hover Management
 
     private func handleHover(_ hovering: Bool) {
+        if vm.todayExpanded { hoverTask?.cancel(); isHovering = hovering; return }
+        if converter.presentation == .permissionWaiting || intelligence.isActive { return }
         if notificationMirror.current != nil {
             hoverTask?.cancel()
             notificationMirror.setHovered(hovering, on: notificationScreenID)
@@ -625,6 +715,7 @@ struct ContentView: View {
     // MARK: - Gesture Handling
 
     private func handleDownGesture(translation: CGFloat, phase: NSEvent.Phase) {
+        guard !intelligence.isActive else { return }
         guard notificationMirror.current == nil else { return }
         guard vm.notchState == .closed else { return }
 
@@ -649,7 +740,9 @@ struct ContentView: View {
     }
 
     private func handleUpGesture(translation: CGFloat, phase: NSEvent.Phase) {
-        guard vm.notchState == .open && !vm.isHoveringCalendar else { return }
+        guard !intelligence.isActive, !vm.todayExpanded else { return }
+        guard vm.notchState == .open && !vm.isHoveringCalendar,
+              converter.presentation != .permissionWaiting else { return }
 
         withAnimation(animationSpring) {
             gestureProgress = (translation / Defaults[.gestureSensitivity]) * -20

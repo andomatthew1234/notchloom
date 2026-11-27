@@ -93,6 +93,8 @@ struct ConversionJob: Identifiable {
     let format: ConversionFormat
     var state: State = .queued
     var outputURL: URL?
+    var outputBookmark: Data?
+    var outputDirectoryURL: URL?
     var error: String?
     var progress: ConversionProgress?
     var startedAt: Date?

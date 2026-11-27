@@ -40,6 +40,14 @@ class BoringViewModel: NSObject, ObservableObject {
     @Published var closedNotchSize: CGSize = getClosedNotchSize()
     @Published var windowContentSize: CGSize = windowSize
     @Published private(set) var conversionExpanded = false
+    @Published private(set) var todayExpanded = false
+    @Published private(set) var powerExpanded = false
+    private var powerPreferredContentHeight: CGFloat?
+    private var powerContractionTask: Task<Void, Never>?
+    @Published private(set) var todayPermissionWaiting = false
+    private var todayPreferredContentHeight: CGFloat?
+    private var todayPermissionPreviousHiding: Bool?
+    private var todayContractionTask: Task<Void, Never>?
     weak var hostWindow: NSWindow?
     
     let webcamManager = WebcamManager.shared
@@ -51,6 +59,8 @@ class BoringViewModel: NSObject, ObservableObject {
     }
 
     func destroy() {
+        todayContractionTask?.cancel()
+        powerContractionTask?.cancel()
         cancellables.forEach { $0.cancel() }
         cancellables.removeAll()
     }
@@ -188,18 +198,46 @@ class BoringViewModel: NSObject, ObservableObject {
             let baseY = frame.maxY - notchSize.height
             let baseX = frame.midX - notchSize.width / 2
             
-            return position.y >= baseY && position.x >= baseX && position.x <= baseX + notchSize.width
+            return position.y >= baseY && position.y <= frame.maxY && position.x >= baseX && position.x <= baseX + notchSize.width
         }
         
         return false
     }
 
     func open() {
-        self.notchSize = conversionExpanded ? getConvertNotchSize(screenUUID: screenUUID) : openNotchSize
+        self.notchSize = todayExpanded ? (todayPermissionWaiting ? todayPermissionSize : todayNotchSize) : conversionExpanded ? getConvertNotchSize(screenUUID: screenUUID) : powerExpanded ? powerNotchSize : openNotchSize
         self.notchState = .open
         
         // Force music information update when notch is opened
         MusicManager.shared.forceUpdate()
+    }
+
+    @MainActor func showIntelligence(size: CGSize) {
+        powerExpanded = false
+        todayExpanded = false
+        finishTodayPermissionWaiting()
+        todayContractionTask?.cancel()
+        // The response and a growing multiline prompt can be taller than the
+        // normal transparent host. Grow it before animating the notch surface.
+        let content = CGSize(width: max(windowSize.width, size.width),
+                             height: max(windowContentSize.height, size.height + shadowPadding))
+        if windowContentSize != content {
+            windowContentSize = content
+            resizeHostWindow(to: content)
+        }
+        notchState = .open
+        notchSize = size
+    }
+
+    @MainActor func restoreFromIntelligence(wasOpen: Bool) {
+        notchSize = wasOpen ? openNotchSize : getClosedNotchSize(screenUUID: screenUUID)
+        notchState = wasOpen ? .open : .closed
+    }
+
+    @MainActor func finishIntelligenceContraction() {
+        guard !conversionExpanded, !todayExpanded, !powerExpanded else { return }
+        windowContentSize = windowSize
+        resizeHostWindow(to: windowSize)
     }
 
     func close() {
@@ -207,9 +245,15 @@ class BoringViewModel: NSObject, ObservableObject {
         if SharingStateManager.shared.preventNotchClose {
             return
         }
+        if powerExpanded { setPowerExpanded(false) }
         if conversionExpanded {
             setConversionExpanded(false)
             finishConversionContraction()
+        }
+        if todayExpanded {
+            todayExpanded = false
+            finishTodayPermissionWaiting()
+            scheduleTodayHostContraction()
         }
         self.notchSize = getClosedNotchSize(screenUUID: self.screenUUID)
         self.closedNotchSize = self.notchSize
@@ -227,10 +271,11 @@ class BoringViewModel: NSObject, ObservableObject {
         }
     }
 
-    @MainActor func setConversionExpanded(_ expanded: Bool, compact: Bool = false) {
+    @MainActor func setConversionExpanded(_ expanded: Bool, compact: Bool = false, permissionWaiting: Bool = false) {
         let full = getConvertNotchSize(screenUUID: screenUUID)
         let target = expanded
-            ? (compact ? CGSize(width: min(540, full.width), height: min(336, full.height)) : full)
+            ? (permissionWaiting ? CGSize(width: min(374, full.width), height: min(68, full.height))
+                : compact ? CGSize(width: min(540, full.width), height: min(336, full.height)) : full)
             : openNotchSize
         let content = CGSize(width: full.width, height: full.height + shadowPadding)
         guard conversionExpanded != expanded || (expanded && notchSize != target) else { return }
@@ -246,7 +291,7 @@ class BoringViewModel: NSObject, ObservableObject {
     }
 
     @MainActor func finishConversionContraction() {
-        guard !conversionExpanded else { return }
+        guard !conversionExpanded, !todayExpanded, !powerExpanded else { return }
         windowContentSize = windowSize
         resizeHostWindow(to: windowSize)
     }
@@ -260,6 +305,149 @@ class BoringViewModel: NSObject, ObservableObject {
         frame.origin.x = screen.frame.midX - content.width / 2
         frame.origin.y = screen.frame.maxY - content.height
         window.setFrame(frame, display: true)
+    }
+
+    private var powerChromeHeight: CGFloat { PowerUsageLayout.chromeHeight(closedHeight: effectiveClosedNotchHeight) }
+    var powerContentHeight: CGFloat { max(0, powerNotchSize.height - powerChromeHeight) }
+    var powerNotchSize: CGSize {
+        let screen = screenUUID.flatMap { NSScreen.screen(withUUID: $0) } ?? hostWindow?.screen ?? NSScreen.main
+        return PowerUsageLayout.panelSize(screen: screen?.frame ?? CGRect(x: 0, y: 0, width: 1440, height: 900),
+                                          visibleFrame: screen?.visibleFrame ?? CGRect(x: 0, y: 0, width: 1440, height: 864),
+                                          contentHeight: powerPreferredContentHeight, closedHeight: effectiveClosedNotchHeight)
+    }
+    @MainActor func updatePowerContentHeight(_ height: CGFloat, reduceMotion: Bool) {
+        guard powerExpanded, height.isFinite, height > 0 else { return }
+        let next = ceil(height)
+        guard powerPreferredContentHeight != next else { return }
+        powerPreferredContentHeight = next
+        refreshPowerLayout(reduceMotion: reduceMotion)
+    }
+    @MainActor func refreshPowerLayout(reduceMotion: Bool) {
+        guard powerExpanded, notchState == .open, !IntelligenceCoordinator.shared.isActive else { return }
+        let target = powerNotchSize
+        let content = CGSize(width: max(windowContentSize.width, target.width), height: max(windowContentSize.height, target.height + shadowPadding))
+        if content != windowContentSize { windowContentSize = content; resizeHostWindow(to: content) }
+        withAnimation(reduceMotion ? .easeOut(duration: 0.14) : .spring(response: 0.35, dampingFraction: 1)) { notchSize = target }
+    }
+    @MainActor func setPowerExpanded(_ expanded: Bool) {
+        guard powerExpanded != expanded else { return }
+        powerContractionTask?.cancel()
+        powerExpanded = expanded
+        if expanded {
+            powerPreferredContentHeight = nil
+            let size = powerNotchSize
+            let content = CGSize(width: max(windowContentSize.width, size.width), height: max(windowContentSize.height, size.height + shadowPadding))
+            windowContentSize = content
+            resizeHostWindow(to: content)
+            if notchState == .open { notchSize = size }
+        } else {
+            // Do not replace another page's geometry during an outgoing view transition.
+            if notchState == .open && !todayExpanded && !conversionExpanded && !IntelligenceCoordinator.shared.isActive {
+                notchSize = openNotchSize
+            }
+            powerContractionTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(520))
+                guard !Task.isCancelled, let self, !self.powerExpanded else { return }
+                self.finishTodayContraction()
+            }
+        }
+    }
+
+    var todayNotchSize: CGSize {
+        let screen = screenUUID.flatMap { NSScreen.screen(withUUID: $0) } ?? hostWindow?.screen ?? NSScreen.main
+        return TodayPageGeometry.panelSize(screen: screen?.frame ?? CGRect(x: 0, y: 0, width: 1440, height: 900),
+                                           visibleFrame: screen?.visibleFrame ?? CGRect(x: 0, y: 50, width: 1440, height: 825),
+                                           preferredContentHeight: todayPreferredContentHeight,
+                                           closedNotchHeight: effectiveClosedNotchHeight)
+    }
+
+    @MainActor func updateTodayContentHeight(_ height: CGFloat?, reduceMotion: Bool) {
+        guard todayExpanded, !todayPermissionWaiting else { return }
+        let next = height.flatMap { $0.isFinite && $0 > 0 ? ceil($0) : nil }
+        guard next != todayPreferredContentHeight else { return }
+        todayPreferredContentHeight = next
+        let target = todayNotchSize
+        // Keep the transparent host large while the visible surface contracts. Its
+        // existing pointer region continues to pass clicks through below the panel.
+        let content = CGSize(width: max(windowContentSize.width, target.width),
+                             height: max(windowContentSize.height, target.height + shadowPadding))
+        if content != windowContentSize {
+            windowContentSize = content
+            resizeHostWindow(to: content)
+        }
+        guard notchSize != target else { return }
+        withAnimation(reduceMotion ? .easeOut(duration: 0.14) : .spring(response: 0.40, dampingFraction: 0.95)) {
+            notchSize = target
+        }
+    }
+
+    @MainActor func setTodayExpanded(_ expanded: Bool) {
+        guard todayExpanded != expanded else { return }
+        todayContractionTask?.cancel()
+        if expanded {
+            guard !conversionExpanded else { return }
+            let target = todayNotchSize
+            let content = CGSize(width: max(windowSize.width, target.width), height: max(windowSize.height, target.height + shadowPadding))
+            windowContentSize = content
+            resizeHostWindow(to: content)
+            todayExpanded = true
+            notchSize = target
+        } else {
+            todayExpanded = false
+            finishTodayPermissionWaiting()
+            notchSize = notchState == .open ? openNotchSize : getClosedNotchSize(screenUUID: screenUUID)
+        }
+    }
+
+    @MainActor func finishTodayContraction() {
+        guard !todayExpanded, !conversionExpanded, !powerExpanded, !IntelligenceCoordinator.shared.isActive else { return }
+        windowContentSize = windowSize
+        resizeHostWindow(to: windowSize)
+    }
+
+    @MainActor func refreshTodayLayout() {
+        guard todayExpanded else { return }
+        let full = todayNotchSize
+        notchSize = todayPermissionWaiting ? todayPermissionSize : full
+        windowContentSize = CGSize(width: max(windowSize.width, full.width), height: max(windowSize.height, full.height + shadowPadding))
+        resizeHostWindow(to: windowContentSize)
+    }
+
+    private var todayPermissionSize: CGSize {
+        TodayLocationPermissionGeometry.panelSize(full: todayNotchSize, closed: CGSize(width: closedNotchSize.width, height: effectiveClosedNotchHeight))
+    }
+    @MainActor func prepareTodayLocationPermission(reduceMotion: Bool) async {
+        guard todayExpanded else { return }
+        if todayPermissionPreviousHiding == nil { todayPermissionPreviousHiding = hostWindow?.hidesOnDeactivate }
+        hostWindow?.hidesOnDeactivate = false
+        (hostWindow as? BoringNotchSkyLightWindow)?.suspendsPointerInput = true
+        await withCheckedContinuation { continuation in
+            withAnimation(reduceMotion ? .easeOut(duration: 0.14) : .spring(response: 0.38, dampingFraction: 0.94), completionCriteria: .logicallyComplete) {
+                todayPermissionWaiting = true
+                notchSize = todayPermissionSize
+            } completion: { continuation.resume() }
+        }
+    }
+    @MainActor func restoreTodayAfterLocationPermission(reduceMotion: Bool) {
+        guard todayExpanded, todayPermissionWaiting else { return }
+        // Keep the setup mounted, hidden and unfocused until the surface has expanded again.
+        withAnimation(reduceMotion ? .easeOut(duration: 0.14) : .spring(response: 0.42, dampingFraction: 0.96), completionCriteria: .logicallyComplete) {
+            notchSize = todayNotchSize
+        } completion: { [weak self] in if self?.todayExpanded == true { self?.finishTodayPermissionWaiting() } }
+    }
+    private func finishTodayPermissionWaiting() {
+        todayPermissionWaiting = false
+        if let previous = todayPermissionPreviousHiding { hostWindow?.hidesOnDeactivate = previous }
+        todayPermissionPreviousHiding = nil
+    }
+
+    @MainActor private func scheduleTodayHostContraction() {
+        todayContractionTask?.cancel()
+        todayContractionTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(520))
+            guard !Task.isCancelled else { return }
+            self?.finishTodayContraction()
+        }
     }
 
     func closeHello() {

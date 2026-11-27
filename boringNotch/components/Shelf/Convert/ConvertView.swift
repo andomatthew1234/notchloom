@@ -116,6 +116,9 @@ struct ConvertPanelView: View {
         .onChange(of: converter.stage) { _, stage in
             if stage != .setup { releaseKeyboardFocus() }
         }
+        .onChange(of: converter.presentation) { _, presentation in
+            if presentation == .permissionWaiting { releaseKeyboardFocus() }
+        }
         .onDisappear { releaseKeyboardFocus() }
         .task(id: first?.id) {
             previewImage = nil
@@ -429,7 +432,7 @@ struct ConvertPanelView: View {
                     settingRow("Save to") {
                         Menu {
                             Button("Beside original") { preferences.useOriginalFolder() }
-                            Button("Choose folder…") { preferences.chooseFolder() }
+                            Button("Choose folder…") { converter.chooseOutputFolder() }
                         } label: {
                             Text(preferences.folderName).lineLimit(1)
                                 .frame(maxWidth: 190, alignment: .trailing)
@@ -606,7 +609,8 @@ struct ConvertPanelView: View {
                         NSWorkspace.shared.activateFileViewerSelecting(converter.outputs)
                     }
                     .buttonStyle(ConvertActionStyle(.secondary))
-                    Button("Open") { converter.outputs.forEach { NSWorkspace.shared.open($0) } }
+                    Button(converter.isOpeningOutputs ? "Opening…" : "Open") { converter.openOutputs() }
+                        .disabled(converter.isOpeningOutputs)
                         .buttonStyle(ConvertActionStyle(.primary))
                 }
                 if converter.failedCount > 0 {

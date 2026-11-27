@@ -74,6 +74,7 @@ struct BoringHeader: View {
                 Spacer(minLength: 0)
                 if showSettings {
                     Button {
+                        if vm.todayExpanded { withAnimation(.easeOut(duration: 0.2)) { vm.close() } }
                         SettingsWindowController.shared.showWindow()
                     } label: {
                         Image(systemName: "gearshape")

@@ -9,7 +9,7 @@ final class ConversionManager: ObservableObject {
 
     enum Stage: Equatable { case idle, preparing, setup, running, finished }
     enum Presentation: Equatable {
-        case shelf, entering, ready, converting, success, failure, cancelled, exiting
+        case shelf, entering, ready, permissionWaiting, converting, success, failure, cancelled, exiting
         var isExpanded: Bool { self != .shelf && self != .exiting }
     }
 
@@ -27,6 +27,7 @@ final class ConversionManager: ObservableObject {
     @Published private(set) var message: String?
     @Published private(set) var technicalDetails: String?
     @Published var isHovered = false
+    @Published private(set) var isOpeningOutputs = false
 
     private let engines: [any ConversionEngine] = [
         ImageIOConversionEngine(), AVFoundationConversionEngine(), FFmpegConversionEngine(),
@@ -41,6 +42,7 @@ final class ConversionManager: ObservableObject {
     private var generation = UUID()
     private var convertedInputIDs = Set<UUID>()
     private var selectedInputID: UUID?
+    private var permissionRequestPending = false
     private init() {
         preset = ConversionPreset(rawValue: UserDefaults.standard.string(forKey: "notchloom.convert.preset") ?? "") ?? .balanced
     }
@@ -179,17 +181,20 @@ final class ConversionManager: ObservableObject {
     }
 
     func start() {
-        guard stage == .setup, let format = selectedFormat, !categoryInputs.isEmpty else { return }
-        do {
-            try ConversionPreferences.shared.authorizeOutputFolders(for: categoryInputs)
-        } catch {
-            message = error.localizedDescription
-            return
+        guard stage == .setup, !permissionRequestPending,
+              let format = selectedFormat, !categoryInputs.isEmpty else { return }
+        let selectedInputs = categoryInputs
+        requestOutputAccess(for: selectedInputs) { [weak self] in
+            self?.beginConversion(inputs: selectedInputs, format: format)
         }
+    }
+
+    private func beginConversion(inputs selectedInputs: [ConversionInput], format: ConversionFormat) {
+        guard stage == .setup, presentation == .ready else { return }
         cancelAllRequested = false
         message = nil
         technicalDetails = nil
-        jobs = categoryInputs.map { ConversionJob(input: $0, format: format) }
+        jobs = selectedInputs.map { ConversionJob(input: $0, format: format) }
         convertedInputIDs.formUnion(jobs.map { $0.input.id })
         stage = .running
         presentation = .converting
@@ -197,16 +202,73 @@ final class ConversionManager: ObservableObject {
         runTask = Task { await runQueue(generation: currentGeneration) }
     }
 
-    func retryFailed() {
-        guard stage == .finished else { return }
-        let failed = jobs.filter { $0.state == .failed }
-        guard !failed.isEmpty else { return }
+    private func requestOutputAccess(for selectedInputs: [ConversionInput], resume: @escaping @MainActor () -> Void) {
+        guard !permissionRequestPending else { return }
         do {
-            try ConversionPreferences.shared.authorizeOutputFolders(for: failed.map(\.input))
+            if try !ConversionPreferences.shared.needsOutputAuthorization(for: selectedInputs) {
+                resume()
+                return
+            }
         } catch {
             message = error.localizedDescription
             return
         }
+
+        permissionRequestPending = true
+        presentation = .permissionWaiting
+        let currentGeneration = generation
+        Task { @MainActor in
+            // Let the existing notch surface finish contracting before macOS presents its panel.
+            await permissionTransition()
+            guard generation == currentGeneration, presentation == .permissionWaiting else { return }
+            do {
+                try await ConversionPreferences.shared.authorizeOutputFolders(for: selectedInputs)
+                guard generation == currentGeneration else { return }
+                presentation = .ready
+                await permissionTransition()
+                guard generation == currentGeneration, presentation == .ready else { return }
+                permissionRequestPending = false
+                resume()
+            } catch {
+                guard generation == currentGeneration else { return }
+                message = error.localizedDescription
+                presentation = .ready
+                permissionRequestPending = false
+            }
+        }
+    }
+
+    private func permissionTransition() async {
+        let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        try? await Task.sleep(for: .milliseconds(reduceMotion ? 180 : 470))
+    }
+
+    func chooseOutputFolder() {
+        guard stage == .setup, !permissionRequestPending else { return }
+        permissionRequestPending = true
+        presentation = .permissionWaiting
+        let currentGeneration = generation
+        Task { @MainActor in
+            await permissionTransition()
+            guard generation == currentGeneration, presentation == .permissionWaiting else { return }
+            _ = await ConversionPreferences.shared.chooseFolder()
+            guard generation == currentGeneration else { return }
+            presentation = .ready
+            permissionRequestPending = false
+        }
+    }
+
+    func retryFailed() {
+        guard stage == .finished, !permissionRequestPending else { return }
+        let failed = jobs.filter { $0.state == .failed }
+        guard !failed.isEmpty else { return }
+        requestOutputAccess(for: failed.map(\.input)) { [weak self] in
+            self?.beginRetry(failed)
+        }
+    }
+
+    private func beginRetry(_ failed: [ConversionJob]) {
+        guard stage == .finished, presentation == .ready || presentation == .failure else { return }
         jobs = failed.map { ConversionJob(input: $0.input, format: $0.format) }
         cancelAllRequested = false
         message = nil
@@ -298,6 +360,9 @@ final class ConversionManager: ObservableObject {
                 }
                 // The temporary output and destination are in one directory, so the move is atomic.
                 try FileManager.default.moveItem(at: temporary, to: destination)
+                // Capture permission while the output directory is still scoped.
+                jobs[index].outputBookmark = try? Bookmark(url: destination).data
+                jobs[index].outputDirectoryURL = folder
                 jobs[index].outputURL = destination
                 jobs[index].state = .completed
             } catch {
@@ -330,6 +395,48 @@ final class ConversionManager: ObservableObject {
         return nil
     }
 
+    func openOutputs() {
+        guard !isOpeningOutputs, !outputs.isEmpty else { return }
+        let results = jobs.filter { $0.outputURL != nil }
+        let activeGeneration = generation
+        isOpeningOutputs = true
+        dismissTask?.cancel()
+        Task {
+            var failures: [String] = []
+            for job in results {
+                guard let output = job.outputURL else { continue }
+                let url = job.outputBookmark.flatMap { Bookmark(data: $0).resolveURL() } ?? output
+                // Keep directory access as a fallback for outputs whose own
+                // bookmark could not be created. Balance both scopes on every path.
+                let directory = job.outputDirectoryURL
+                let directoryScoped = directory?.startAccessingSecurityScopedResource() ?? false
+                let fileScoped = url.startAccessingSecurityScopedResource()
+                defer {
+                    if fileScoped { url.stopAccessingSecurityScopedResource() }
+                    if directoryScoped { directory?.stopAccessingSecurityScopedResource() }
+                }
+                do {
+                    _ = try await url.resourceValues(forKeys: [.isReadableKey])
+                    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                        NSWorkspace.shared.open(url, configuration: .init()) { _, error in
+                            if let error { continuation.resume(throwing: error) }
+                            else { continuation.resume() }
+                        }
+                    }
+                } catch {
+                    failures.append("\(output.lastPathComponent): \(error.localizedDescription)")
+                }
+            }
+            isOpeningOutputs = false
+            guard generation == activeGeneration else { return }
+            if !failures.isEmpty {
+                message = "Couldn’t open the converted file. " + failures.joined(separator: "\n")
+                technicalDetails = failures.joined(separator: "\n")
+            }
+            if !isHovered { scheduleDismissal() }
+        }
+    }
+
     func cancelCurrent() { currentTask?.cancel() }
     func cancelAll() {
         guard stage == .running else { return }
@@ -338,7 +445,7 @@ final class ConversionManager: ObservableObject {
     }
 
     func close() {
-        guard presentation != .exiting && presentation != .shelf else { return }
+        guard !permissionRequestPending, presentation != .exiting && presentation != .shelf else { return }
         if stage == .running {
             closeAfterCancellation = true
             cancelAll()
@@ -363,6 +470,7 @@ final class ConversionManager: ObservableObject {
 
     private func resetState() {
         dismissTask?.cancel()
+        permissionRequestPending = false
         presentationScreenID = nil
         inputs = []
         convertedInputIDs = []

@@ -7,6 +7,7 @@ struct NotchNotification: Decodable, Identifiable, Equatable {
     let source: String
     let title: String
     let body: String
+    var deliveryID: String?
 
     var fingerprint: String { "\(source)|\(title)|\(body)" }
     var isLocal: Bool { source == "Notchloom" }
@@ -28,6 +29,28 @@ struct NotchNotification: Decodable, Identifiable, Equatable {
                          "Reminders": "com.apple.reminders"]
         guard let id = knownApps[source] else { return nil }
         return NSWorkspace.shared.urlForApplication(withBundleIdentifier: id)
+    }
+}
+
+/// Tracks visible instances rather than suppressing matching message text by time.
+struct NotificationArrivalTracker {
+    private var visibleIDs = Set<String>()
+    private var recentDeliveries: [String] = []
+
+    mutating func arrivals(in banners: [NotchNotification]) -> [NotchNotification] {
+        var arrivals: [NotchNotification] = []
+        for banner in banners where !visibleIDs.contains(banner.id) {
+            // Notification Center can briefly remove a card while rearranging its
+            // stack. Its delivery UUID identifies the same alert when it returns.
+            if let deliveryID = banner.deliveryID {
+                guard !recentDeliveries.contains(deliveryID) else { continue }
+                recentDeliveries.append(deliveryID)
+                if recentDeliveries.count > 64 { recentDeliveries.removeFirst() }
+            }
+            arrivals.append(banner)
+        }
+        visibleIDs = Set(banners.map(\.id))
+        return arrivals
     }
 }
 

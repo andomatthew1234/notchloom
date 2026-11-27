@@ -76,7 +76,18 @@ private struct FixtureHost: View {
         let baseline = NSHostingView(rootView: FixtureHost(state: original, presentation: presentation, wrapped: false))
         let actual = NSHostingView(rootView: FixtureHost(state: wrapped, presentation: presentation, wrapped: true))
         let hosts = [baseline, actual]
-        for host in hosts { host.frame = CGRect(x: 0, y: 0, width: 640, height: 210) }
+        // Geometry-based surface registration needs a real window on current macOS.
+        // Keep these offscreen; otherwise enqueue never leaves idle and the test
+        // fails before exercising notification layout at all.
+        let windows = hosts.enumerated().map { index, host in
+            host.frame = CGRect(x: 0, y: 0, width: 640, height: 210)
+            let window = NSPanel(contentRect: host.frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+            window.contentView = host
+            window.setFrameOrigin(NSPoint(x: -4000, y: -4000 - index * 240))
+            window.orderBack(nil)
+            return window
+        }
+        defer { windows.forEach { $0.orderOut(nil) } }
 
         func settle() async throws {
             for host in hosts { host.layoutSubtreeIfNeeded() }

@@ -1,0 +1,29 @@
+# Shared standalone test target. Does not compile the application composition root or read app credentials.
+today_sources=(
+  boringNotch/Intelligence/GeminiCredentialStore.swift
+  boringNotch/Intelligence/GeminiClient.swift
+  boringNotch/Intelligence/GeminiModelStore.swift
+  boringNotch/Intelligence/TodayContextModels.swift
+  boringNotch/Intelligence/TodayDataSources.swift
+  boringNotch/Intelligence/TodayWeatherSource.swift
+  boringNotch/Intelligence/TodayNotificationSource.swift
+  boringNotch/Intelligence/TodayContextService.swift
+  boringNotch/Intelligence/TodayContextController.swift
+  boringNotch/Intelligence/TodayReport.swift
+  boringNotch/Intelligence/TodayPresentation.swift
+  boringNotch/Intelligence/TodayContextPresentation.swift
+  boringNotch/Intelligence/TodayPreviewContent.swift
+  boringNotch/Intelligence/TodayInlineText.swift
+  boringNotch/Intelligence/TodayPageView.swift
+  boringNotch/Intelligence/TodaySetupView.swift
+  boringNotch/Intelligence/TodayDataPageHost.swift
+  boringNotch/Intelligence/TodayDataSettingsView.swift
+  boringNotch/Intelligence/TodayBriefingModels.swift
+  boringNotch/Intelligence/TodayPromptBuilder.swift
+  boringNotch/Intelligence/TodayBriefingCache.swift
+  boringNotch/Intelligence/TodayBriefingService.swift
+  boringNotch/Intelligence/TodayBriefingCoordinator.swift
+  boringNotch/Intelligence/TodayBriefingPage.swift
+  boringNotch/extensions/PanGesture.swift
+  boringNotch/components/Notch/TodayWidget.swift
+)

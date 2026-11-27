@@ -43,26 +43,28 @@ final class ConversionPreferences: ObservableObject {
         sourceFolderBookmarks = defaults.dictionary(forKey: "notchloom.convert.source-folders") as? [String: Data] ?? [:]
     }
 
-    func chooseFolder() {
+    func chooseFolder() async -> Bool {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         panel.prompt = "Use for conversions"
-        guard panel.runModal() == .OK, let url = panel.url,
-              let bookmark = try? Bookmark(url: url) else { return }
+        guard await panel.begin() == .OK, let url = panel.url,
+              let bookmark = try? Bookmark(url: url) else { return false }
         folderBookmark = bookmark.data
+        return true
     }
 
     func useOriginalFolder() { folderBookmark = nil }
 
     /// A dropped file grants access to that file, but not necessarily to create a sibling.
     /// Ask once for each source directory and keep its security-scoped bookmark.
-    func authorizeOutputFolders(for inputs: [ConversionInput]) throws {
-        let folders = folderBookmark == nil
-            ? Array(Set(inputs.map { $0.url.deletingLastPathComponent().standardizedFileURL.path })).sorted()
-                .map { URL(fileURLWithPath: $0, isDirectory: true) }
-            : [try resolvedFolder(for: inputs[0].url)]
+    func needsOutputAuthorization(for inputs: [ConversionInput]) throws -> Bool {
+        try outputFolders(for: inputs).contains { !canWrite(in: resolvedScopedFolder($0)) }
+    }
+
+    func authorizeOutputFolders(for inputs: [ConversionInput]) async throws {
+        let folders = try outputFolders(for: inputs)
         for folder in folders {
             let scopedFolder = resolvedScopedFolder(folder)
             if canWrite(in: scopedFolder) { continue }
@@ -74,8 +76,10 @@ final class ConversionPreferences: ObservableObject {
             panel.directoryURL = folder
             panel.prompt = "Allow Access"
             panel.message = "Allow Notchloom to save converted files in \(folder.lastPathComponent)."
-            guard panel.runModal() == .OK,
-                  let selected = panel.url?.standardizedFileURL,
+            guard await panel.begin() == .OK else {
+                throw ConversionError.unavailable("Access to \(folder.lastPathComponent) was cancelled. No conversion started.")
+            }
+            guard let selected = panel.url?.standardizedFileURL,
                   selected.path == folder.standardizedFileURL.path else {
                 throw ConversionError.unavailable("Choose \(folder.lastPathComponent) to save beside the original, or select another output folder in Settings.")
             }
@@ -89,6 +93,15 @@ final class ConversionPreferences: ObservableObject {
                 throw ConversionError.unavailable("macOS did not grant write access to \(folder.lastPathComponent). Choose another output folder in Settings.")
             }
         }
+    }
+
+    private func outputFolders(for inputs: [ConversionInput]) throws -> [URL] {
+        guard !inputs.isEmpty else { return [] }
+        let folders = folderBookmark == nil
+            ? Array(Set(inputs.map { $0.url.deletingLastPathComponent().standardizedFileURL.path })).sorted()
+                .map { URL(fileURLWithPath: $0, isDirectory: true) }
+            : [try resolvedFolder(for: inputs[0].url)]
+        return folders
     }
 
     func resolvedFolder(for input: URL) throws -> URL {

@@ -381,6 +381,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
         }
 
+        KeyboardShortcuts.onKeyDown(for: .openIntelligence) { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self, !IntelligenceCoordinator.shared.isActive,
+                      !ConversionManager.shared.presentation.isExpanded else { return }
+                let mouseLocation = NSEvent.mouseLocation
+                var target = self.vm
+                if Defaults[.showOnAllDisplays] {
+                    for screen in NSScreen.screens where screen.frame.contains(mouseLocation) {
+                        if let uuid = screen.displayUUID, let model = self.viewModels[uuid] {
+                            target = model
+                            break
+                        }
+                    }
+                }
+                self.closeNotchTask?.cancel()
+                self.closeNotchTask = nil
+                IntelligenceCoordinator.shared.activate(on: target)
+            }
+        }
+
         KeyboardShortcuts.onKeyDown(for: .toggleSneakPeek) { [weak self] in
             guard let self = self else { return }
             if Defaults[.sneakPeekStyles] == .inline {

@@ -21,6 +21,8 @@ import Foundation
     func isScreenBrightnessAvailable(with reply: @escaping (Bool) -> Void)
     func currentScreenBrightness(with reply: @escaping (NSNumber?) -> Void)
     func setScreenBrightness(_ value: Float, with reply: @escaping (Bool) -> Void)
+    func runIntelligenceShortcut(_ name: String, prompt: String, requestID: String, with reply: @escaping (Data) -> Void)
+    func cancelIntelligenceShortcut(_ requestID: String)
 }
 
 /*

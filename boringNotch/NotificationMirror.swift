@@ -1,14 +1,28 @@
 import AppKit
+import Combine
 import Defaults
 import SwiftUI
 
 /// Capture adapter. Presentation and animation live in NotificationPresentation.
 @MainActor
 final class NotificationMirror: NotificationPresentation {
+    /// New, legitimately observed visible banners only; preview/local animations never publish here.
+    let observedBanners = PassthroughSubject<NotchNotification, Never>()
     static let shared = NotificationMirror()
     private var pollingTask: Task<Void, Never>?
-    private var seen: [String: Date] = [:]
-    private var didTakeInitialSnapshot = false
+    enum CaptureStatus: String {
+        case checking = "Checking notification access…"
+        case ready = "Ready to read visible macOS banners"
+        case needsAccess = "Accessibility access is required"
+        case disconnected = "Notification reader is unavailable"
+        case off = "Notification mirroring is off"
+    }
+    private struct Snapshot: Decodable {
+        let accessibilityAuthorized: Bool
+        let banners: [NotchNotification]
+    }
+    @Published private(set) var captureStatus: CaptureStatus = .checking
+    private var arrivals = NotificationArrivalTracker()
 
     func start() {
         guard pollingTask == nil else { return }
@@ -18,8 +32,8 @@ final class NotificationMirror: NotificationPresentation {
                 if Defaults[.showNotificationBanners] {
                     await self.readVisibleBanners()
                 } else {
-                    self.didTakeInitialSnapshot = false
-                    self.seen.removeAll()
+                    self.arrivals = NotificationArrivalTracker()
+                    self.captureStatus = .off
                     self.discardMirroredNotifications()
                 }
                 try? await Task.sleep(for: .milliseconds(350))
@@ -30,8 +44,7 @@ final class NotificationMirror: NotificationPresentation {
     func stop() {
         pollingTask?.cancel()
         pollingTask = nil
-        seen.removeAll()
-        didTakeInitialSnapshot = false
+        arrivals = NotificationArrivalTracker()
         reset()
     }
 
@@ -56,18 +69,15 @@ final class NotificationMirror: NotificationPresentation {
 
     private func readVisibleBanners() async {
         guard let data = await XPCHelperClient.shared.visibleNotificationBanners(),
-              let banners = try? JSONDecoder().decode([NotchNotification].self, from: data) else { return }
-        let now = Date()
-        seen = seen.filter { now.timeIntervalSince($0.value) < 25 }
-        if !didTakeInitialSnapshot {
-            banners.forEach { seen[$0.fingerprint] = now }
-            didTakeInitialSnapshot = true
+              let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data) else {
+            captureStatus = .disconnected
             return
         }
-        for banner in banners {
-            if seen[banner.fingerprint] == nil { enqueue(banner) }
-            // Keep a persistent visible alert from being re-enqueued every 25 seconds.
-            seen[banner.fingerprint] = now
+        guard snapshot.accessibilityAuthorized else {
+            captureStatus = .needsAccess
+            return
         }
+        captureStatus = .ready
+        for banner in arrivals.arrivals(in: snapshot.banners) { observedBanners.send(banner); enqueue(banner) }
     }
 }

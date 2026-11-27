@@ -35,10 +35,29 @@ struct ShelfView: View {
                 .padding(.horizontal, 16)
                 .transition(reduceMotion ? .opacity : .opacity.combined(with: .offset(y: -8)))
             } else {
-                ConvertPanelView()
-                    .frame(height: max(190, vm.notchSize.height - max(36, vm.effectiveClosedNotchHeight) - 20))
-                    .opacity(converter.presentation == .exiting ? 0 : 1)
-                    .allowsHitTesting(converter.presentation != .exiting)
+                VStack(spacing: 0) {
+                    ConvertPanelView()
+                        .frame(height: converter.presentation == .permissionWaiting ? 0 :
+                            max(190, vm.notchSize.height - max(36, vm.effectiveClosedNotchHeight) - 20))
+                        .clipped()
+                        .opacity(converter.presentation == .exiting || converter.presentation == .permissionWaiting ? 0 : 1)
+                        .allowsHitTesting(converter.presentation != .exiting && converter.presentation != .permissionWaiting)
+                    if converter.presentation == .permissionWaiting {
+                        HStack(spacing: 9) {
+                            Image(systemName: "exclamationmark.circle.fill")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(.orange)
+                            Text("Select Allow Access to continue")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(.white)
+                                .lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 28)
+                        .transition(.opacity)
+                        .accessibilityElement(children: .combine)
+                    }
+                }
             }
         }
         .animation(reduceMotion ? .easeOut(duration: 0.15) : .easeInOut(duration: 0.22),
